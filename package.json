@@ -1,0 +1,17 @@
+{
+  "name": "aiml-widget",
+  "version": "1.0.0",
+  "description": "Embeddable AI chat widget for any website",
+  "license": "MIT",
+  "scripts": {
+    "build": "node build.js",
+    "build:watch": "node build.js --watch",
+    "size": "node -e \"const fs=require('fs');const z=require('zlib');const b=fs.readFileSync('dist/widget.js');z.gzip(b,(e,r)=>{console.log(r.length+' bytes gzipped');})\""
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.0"
+  },
+  "files": [
+    "dist/"
+  ]
+}
