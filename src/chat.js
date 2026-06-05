@@ -96,6 +96,8 @@ export class ChatClient {
             const parsed = JSON.parse(data);
             if (parsed.token !== undefined) callbacks.onToken(parsed.token);
             if (parsed.citations) callbacks.onCitations(parsed.citations);
+            // Server found nothing relevant: offer related topics + email capture instead of a dead-end.
+            if (parsed.noAnswer) callbacks.onNoAnswer?.();
           } catch { /* ignore malformed line */ }
         }
       }

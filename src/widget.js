@@ -8,6 +8,10 @@ import { WidgetUI } from './ui.js';
   if (window.__aimlWidgetLoaded) return;
   window.__aimlWidgetLoaded = true;
 
+  // Shown as the AI's opening message when the site owner hasn't set a custom greeting.
+  const DEFAULT_GREETING =
+    "Hi! 👋 I'm this site's AI assistant. Ask me anything — I'll answer from this site's own content and show you the sources.";
+
   // Read config from the script tag's data attributes
   const script = document.currentScript ||
     document.querySelector('script[data-api-key]');
@@ -23,6 +27,11 @@ import { WidgetUI } from './ui.js';
   const position = script.getAttribute('data-position') || 'right'; // 'right' | 'left'
   const theme = script.getAttribute('data-theme') || 'auto';        // 'light' | 'dark' | 'auto'
   const primaryColor = script.getAttribute('data-primary-color') || null;
+  // Comma-separated list of suggested questions, e.g. data-suggested-questions="How do I install?,...
+  const suggestedQuestionsAttr = script.getAttribute('data-suggested-questions');
+  const suggestedQuestionsOverride = suggestedQuestionsAttr
+    ? suggestedQuestionsAttr.split('|').map(q => q.trim()).filter(Boolean)
+    : null;
 
   if (!apiKey) {
     console.warn('[AIML] Missing data-api-key on script tag.');
@@ -62,6 +71,10 @@ import { WidgetUI } from './ui.js';
     const serverConfig = await fetchConfig();
     const session = getSession();
 
+    const suggestedQuestions = suggestedQuestionsOverride
+      ?? serverConfig.suggestedQuestions
+      ?? [];
+
     const uiConfig = {
       position,
       theme,
@@ -71,6 +84,7 @@ import { WidgetUI } from './ui.js';
       placeholder: serverConfig.placeholder || 'Ask a question…',
       greeting: serverConfig.greeting || null,
       showBranding: serverConfig.showBranding !== false,
+      suggestedQuestions,
     };
 
     const ui = new WidgetUI(uiConfig);
@@ -78,19 +92,17 @@ import { WidgetUI } from './ui.js';
 
     ui.mount();
 
-    if (uiConfig.greeting && session.history.length === 0) {
-      // Show greeting when window first opens
-      const origOpen = ui.open.bind(ui);
-      let greeted = false;
-      ui.open = function () {
-        origOpen();
-        if (!greeted) { greeted = true; ui.showGreeting(uiConfig.greeting); }
-      };
-    }
+    // Greet proactively so the panel is NEVER empty. We render a welcome bubble + (if configured)
+    // suggested-question chips into the chat area right away — visible the moment the visitor opens
+    // the widget, so they never face a blank box and have to figure out what to type. Rendered on
+    // mount (not on first open) so it's robust to the open/toggle path and to a persisted session.
+    ui.showGreeting(uiConfig.greeting || DEFAULT_GREETING);
+    ui.showSuggestedChips(uiConfig.suggestedQuestions, 'Try asking:');
 
     // Listen for send events from the UI
     ui.host.addEventListener('aiml:send', async (e) => {
       const text = e.detail.text;
+      ui.hideWelcomeState();
       session.history.push({ role: 'user', content: text });
       saveSession(session);
 
@@ -99,21 +111,35 @@ import { WidgetUI } from './ui.js';
 
       let fullResponse = '';
 
+      // Finalize the bot bubble exactly once — citations, no-answer, and done can all arrive.
+      let finalized = false;
+      const finalize = (citations) => {
+        if (finalized) return;
+        finalized = true;
+        ui.finishBotMessage(citations);
+        if (fullResponse) {
+          session.history.push({ role: 'assistant', content: fullResponse });
+          saveSession(session);
+        }
+      };
+
       await client.send(text, session.history.slice(0, -1), session.conversationId, session.visitorId, {
         onToken(token) {
           fullResponse += token;
           ui.appendToken(token);
         },
         onCitations(citations) {
-          ui.finishBotMessage(citations);
-          session.history.push({ role: 'assistant', content: fullResponse });
-          saveSession(session);
+          finalize(citations);
+        },
+        onNoAnswer() {
+          // Honest deflection: close the bubble, then offer what we CAN help with + email capture.
+          finalize([]);
+          ui.showNoAnswerHelp(text, uiConfig.suggestedQuestions, websiteId
+            ? (email, question) => client.captureLead(websiteId, email, question)
+            : null);
         },
         onDone() {
-          if (!fullResponse) return;
-          ui.finishBotMessage([]);
-          session.history.push({ role: 'assistant', content: fullResponse });
-          saveSession(session);
+          finalize([]);
         },
         onError(type, extra) {
           if (type === 'noContent' && websiteId) {

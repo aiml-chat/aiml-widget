@@ -301,6 +301,62 @@
 .aiml-lead-success { font-size: 13px; color: #16a34a; margin-top: 4px; font-weight: 500; }
 .aiml-hidden { display: none !important; }
 
+/* Welcome / empty state */
+.aiml-welcome {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 32px 16px 16px;
+  flex: 1;
+}
+.aiml-welcome-icon {
+  font-size: 32px;
+  margin-bottom: 12px;
+  opacity: 0.85;
+}
+.aiml-welcome-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--aiml-text);
+  margin: 0 0 6px;
+}
+.aiml-welcome-sub {
+  font-size: 13px;
+  color: var(--aiml-text-muted);
+  margin: 0 0 16px;
+  line-height: 1.5;
+}
+.aiml-suggested {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  max-width: 320px;
+}
+.aiml-suggested-btn {
+  text-align: left;
+  padding: 10px 13px;
+  background: var(--aiml-bg);
+  border: 1px solid var(--aiml-border);
+  border-radius: 10px;
+  font-size: 13px;
+  color: var(--aiml-text);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  font-family: var(--aiml-font);
+  line-height: 1.4;
+}
+.aiml-suggested-btn:hover {
+  border-color: var(--aiml-primary);
+  background: var(--aiml-surface);
+}
+.aiml-suggested-btn:focus-visible {
+  outline: 2px solid var(--aiml-primary);
+  outline-offset: 1px;
+}
+
 /* Dark mode */
 @media (prefers-color-scheme: dark) {
   :host([data-theme="auto"]), :host([data-theme="dark"]) {

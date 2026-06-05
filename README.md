@@ -2,7 +2,7 @@
 
 [![Build & Size Check](https://github.com/aimlchat/aiml-widget/actions/workflows/build.yml/badge.svg)](https://github.com/aimlchat/aiml-widget/actions/workflows/build.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Bundle size](https://img.shields.io/badge/gzipped-6.8KB-brightgreen)](dist/widget.js)
+[![Bundle size](https://img.shields.io/badge/gzipped-8.0KB-brightgreen)](dist/widget.js)
 
 Embeddable AI chat widget for any website. Add one script tag — visitors get an AI assistant that answers questions using only your site's content.
 
@@ -35,6 +35,7 @@ All configuration is via `data-*` attributes on the script tag:
 | `data-theme` | `auto` \| `light` \| `dark` | `auto` | Colour scheme. |
 | `data-primary-color` | CSS colour | `#2563eb` | Override the primary accent colour. |
 | `data-api-url` | URL | `https://api.aiml.chat` | Override the API base URL (self-hosted). |
+| `data-suggested-questions` | pipe-separated strings | — | Up to 4 suggested questions shown on first open. |
 
 ### Example with all options
 

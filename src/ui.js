@@ -90,7 +90,7 @@ export class WidgetUI {
         </button>
       </div>
       <div class="aiml-footer${this.config.showBranding === false ? ' aiml-no-brand' : ''}">
-        <a class="aiml-badge" href="https://aiml.chat" target="_blank" rel="noopener noreferrer" tabindex="${this.config.showBranding === false ? '-1' : '0'}">
+        <a class="aiml-badge" href="https://aiml.chat?ref=widget" target="_blank" rel="noopener noreferrer" tabindex="${this.config.showBranding === false ? '-1' : '0'}">
           Powered by aiml.chat
         </a>
       </div>`;
@@ -255,11 +255,17 @@ export class WidgetUI {
 
     if (this._typingEl) { this._typingEl.remove(); this._typingEl = null; }
 
-    if (this._streamingEl && citations?.length) {
+    // Tolerate both camelCase (current API) and PascalCase (older API / cached answers), and drop
+    // any citation without a URL so we never render an "undefined" link.
+    const sources = (citations || [])
+      .map(c => ({ url: c.sourceUrl || c.SourceUrl || '', title: c.title || c.Title || '' }))
+      .filter(c => c.url);
+
+    if (this._streamingEl && sources.length) {
       const citDiv = document.createElement('div');
       citDiv.className = 'aiml-citations';
       citDiv.innerHTML = `<div class="aiml-citations-title">Sources</div>` +
-        citations.map(c => `<a class="aiml-citation-link" href="${escAttr(c.sourceUrl)}" target="_blank" rel="noopener noreferrer" title="${escAttr(c.title || c.sourceUrl)}">${escHtml(c.title || c.sourceUrl)}</a>`).join('');
+        sources.map(c => `<a class="aiml-citation-link" href="${escAttr(c.url)}" target="_blank" rel="noopener noreferrer" title="${escAttr(c.title || c.url)}">${escHtml(c.title || c.url)}</a>`).join('');
       this._streamingEl.appendChild(citDiv);
     }
 
@@ -307,6 +313,48 @@ export class WidgetUI {
     msg.setAttribute('aria-label', 'AI Assistant');
     msg.innerHTML = `<div class="aiml-msg-bubble">${renderMarkdown(text)}</div>`;
     messages.appendChild(msg);
+  }
+
+  // Clickable starter-question chips. Shown beneath the AI's greeting on first open, and reused in the
+  // no-answer flow ("you could ask about…"). Removed as soon as the visitor sends anything.
+  showSuggestedChips(suggestedQuestions, heading) {
+    const messages = this.shadow.querySelector('.aiml-messages');
+    const existing = messages.querySelector('.aiml-welcome');
+    if (existing) existing.remove();
+
+    const qs = Array.isArray(suggestedQuestions) ? suggestedQuestions.slice(0, 4) : [];
+    if (!qs.length) return;
+
+    const div = document.createElement('div');
+    div.className = 'aiml-welcome';
+    div.innerHTML =
+      `${heading ? `<p class="aiml-welcome-sub">${escHtml(heading)}</p>` : ''}` +
+      `<div class="aiml-suggested" role="list">${
+        qs.map(q => `<button class="aiml-suggested-btn" type="button" role="listitem">${escHtml(q)}</button>`).join('')
+      }</div>`;
+
+    div.querySelectorAll('.aiml-suggested-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        div.remove();
+        this._emitSend(btn.textContent);
+      });
+    });
+
+    messages.appendChild(div);
+    this._scrollToBottom();
+  }
+
+  // After an honest "I couldn't find that" reply: offer related topics the assistant CAN answer, and
+  // (when lead capture is available) let the visitor leave their email for a human follow-up.
+  showNoAnswerHelp(question, suggestedQuestions, onLeadSubmit) {
+    this.showSuggestedChips(suggestedQuestions, 'You could ask about:');
+    if (onLeadSubmit) this.showLeadCaptureForm(question, onLeadSubmit);
+  }
+
+  hideWelcomeState() {
+    const messages = this.shadow.querySelector('.aiml-messages');
+    const welcome = messages.querySelector('.aiml-welcome');
+    if (welcome) welcome.remove();
   }
 
   showLeadCaptureForm(question, onSubmit) {

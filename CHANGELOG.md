@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.0.0] — 2026-05-31
+
+### Added
+- **Welcome/Empty state** — shown on first widget open with greeting text and up to 4 configurable suggested-question buttons
+- `data-suggested-questions` attribute — pipe-separated list of questions shown on welcome screen
+- Widget config endpoint now returns `suggestedQuestions[]` array from dashboard settings
+- "Powered by aiml.chat" badge link now includes `?ref=widget` UTM parameter for referral tracking
+- Welcome state is dismissed automatically when the user sends their first message
+
+### Changed
+- Bundle size: 8.0KB gzipped (welcome state CSS added)
+
 ## [Unreleased]
 
 ## [0.4.0] — 2026-05
