@@ -24,11 +24,12 @@ import { WidgetUI } from './ui.js';
   const apiKey = script.getAttribute('data-api-key');
   const websiteId = script.getAttribute('data-website-id');
   const apiUrl = script.getAttribute('data-api-url') || 'https://api.aiml.chat';
-  const position = script.getAttribute('data-position') || 'right'; // 'right' | 'left'
-  const theme = script.getAttribute('data-theme') || 'auto';        // 'light' | 'dark' | 'auto'
-  const primaryColor = script.getAttribute('data-primary-color') || null;
-  // Comma-separated list of suggested questions, e.g. data-suggested-questions="How do I install?,...
-  const suggestedQuestionsAttr = script.getAttribute('data-suggested-questions');
+
+  // Per-option embed overrides. Attributes win over the dashboard config ONLY when explicitly set —
+  // an absent attribute means "use whatever the site owner configured in the dashboard".
+  const attr = (name) => script.getAttribute('data-' + name);
+  // Comma-free list separator is | so questions can contain commas.
+  const suggestedQuestionsAttr = attr('suggested-questions');
   const suggestedQuestionsOverride = suggestedQuestionsAttr
     ? suggestedQuestionsAttr.split('|').map(q => q.trim()).filter(Boolean)
     : null;
@@ -37,6 +38,16 @@ import { WidgetUI } from './ui.js';
     console.warn('[AIML] Missing data-api-key on script tag.');
     return;
   }
+
+  // Cheap input guards: a color must look like a CSS color literal (hex/rgb/hsl — no url(), no
+  // semicolons that could escape the declaration); images must be https.
+  const safeColor = (c) => c && /^(#[0-9a-fA-F]{3,8}|(rgb|hsl)a?\([\d\s.,%\/]+\))$/.test(c.trim()) ? c.trim() : null;
+  const safeUrl = (u) => u && /^https:\/\/[^\s"'<>]+$/i.test(u.trim()) ? u.trim() : null;
+  const intOr = (v, fallback, min, max) => {
+    const n = parseInt(v, 10);
+    return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : fallback;
+  };
+  const oneOf = (v, allowed) => allowed.includes(v) ? v : null;
 
   // Session state (per-tab, cleared on close)
   const SESSION_KEY = `aiml_session_${websiteId || 'default'}`;
@@ -75,17 +86,32 @@ import { WidgetUI } from './ui.js';
       ?? serverConfig.suggestedQuestions
       ?? [];
 
+    // Precedence per option: explicit data-attribute → dashboard config → default.
     const uiConfig = {
-      position,
-      theme,
-      primaryColor,
-      title: serverConfig.title || 'AI Assistant',
-      subtitle: serverConfig.subtitle || 'Ask me anything',
+      position: oneOf(attr('position'), ['left', 'right']) || serverConfig.position || 'right',
+      theme: oneOf(attr('theme'), ['light', 'dark', 'auto']) || serverConfig.theme || 'auto',
+      primaryColor: safeColor(attr('primary-color')) || safeColor(serverConfig.primaryColor) || null,
+      title: attr('title') || serverConfig.title || 'AI Assistant',
+      subtitle: attr('subtitle') || serverConfig.subtitle || 'Ask me anything',
       placeholder: serverConfig.placeholder || 'Ask a question…',
-      greeting: serverConfig.greeting || null,
+      greeting: attr('greeting') || serverConfig.greeting || null,
       showBranding: serverConfig.showBranding !== false,
       suggestedQuestions,
+      // Appearance extras (all optional; dashboard-first with embed overrides):
+      avatarUrl: safeUrl(attr('avatar')) || safeUrl(serverConfig.avatarUrl) || null,
+      launcherIconUrl: safeUrl(attr('launcher-icon')) || safeUrl(serverConfig.launcherIconUrl) || null,
+      launcherSize: oneOf(attr('launcher-size'), ['sm', 'md', 'lg']) || serverConfig.launcherSize || 'md',
+      launcherLabel: attr('launcher-label') ?? serverConfig.launcherLabel ?? null,
+      radius: oneOf(attr('radius'), ['none', 'md', 'xl']) || serverConfig.radius || 'md',
+      offsetX: intOr(attr('offset-x') ?? serverConfig.offsetX, 24, 0, 400),
+      offsetY: intOr(attr('offset-y') ?? serverConfig.offsetY, 24, 0, 400),
+      zIndex: intOr(attr('z-index') ?? serverConfig.zIndex, 2147483647, 1, 2147483647),
+      autoOpenDelaySec: intOr(attr('auto-open') ?? serverConfig.autoOpenDelaySec, 0, 0, 600),
+      hideOnMobile: (attr('hide-mobile') ?? String(serverConfig.hideOnMobile ?? false)) === 'true',
     };
+
+    // Owner chose to keep the widget off small screens (e.g. it overlaps a mobile nav).
+    if (uiConfig.hideOnMobile && window.matchMedia('(max-width: 640px)').matches) return;
 
     const ui = new WidgetUI(uiConfig);
     const client = new ChatClient(apiUrl, apiKey);
@@ -98,6 +124,16 @@ import { WidgetUI } from './ui.js';
     // mount (not on first open) so it's robust to the open/toggle path and to a persisted session.
     ui.showGreeting(uiConfig.greeting || DEFAULT_GREETING);
     ui.showSuggestedChips(uiConfig.suggestedQuestions, 'Try asking:');
+
+    // Proactive open, ONCE per tab session — a classic engagement pattern, but re-opening on every
+    // navigation is the fastest way to get the widget uninstalled.
+    if (uiConfig.autoOpenDelaySec > 0 && !session.autoOpened) {
+      setTimeout(() => {
+        if (!ui.isOpen) ui.open();
+        session.autoOpened = true;
+        saveSession(session);
+      }, uiConfig.autoOpenDelaySec * 1000);
+    }
 
     // Listen for send events from the UI
     ui.host.addEventListener('aiml:send', async (e) => {

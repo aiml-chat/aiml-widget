@@ -32,12 +32,18 @@ export class WidgetUI {
     style.textContent = styles;
     this.shadow.appendChild(style);
 
-    // Apply custom primary color
-    if (this.config.primaryColor) {
-      style.textContent += `:host { --aiml-primary: ${this.config.primaryColor}; }`;
-    }
+    // Per-site appearance via CSS custom properties (values are validated upstream in widget.js).
+    const radii = { none: '0px', md: '12px', xl: '20px' };
+    const overrides = [];
+    if (this.config.primaryColor) overrides.push(`--aiml-primary: ${this.config.primaryColor};`);
+    if (this.config.radius in radii) overrides.push(`--aiml-radius: ${radii[this.config.radius]};`);
+    overrides.push(`--aiml-offset-x: ${this.config.offsetX ?? 24}px;`);
+    overrides.push(`--aiml-offset-y: ${this.config.offsetY ?? 24}px;`);
+    if (this.config.zIndex) overrides.push(`--aiml-z: ${this.config.zIndex};`);
+    style.textContent += `:host { ${overrides.join(' ')} }`;
 
     this.shadow.appendChild(this._buildTrigger());
+    if (this.config.launcherLabel) this.shadow.appendChild(this._buildLauncherLabel());
     this.shadow.appendChild(this._buildWindow());
 
     this._bindEvents();
@@ -46,14 +52,40 @@ export class WidgetUI {
 
   _buildTrigger() {
     const btn = document.createElement('button');
-    btn.className = `aiml-trigger${this.config.position === 'left' ? ' aiml-left' : ''}`;
+    const size = this.config.launcherSize === 'sm' ? ' aiml-sz-sm'
+      : this.config.launcherSize === 'lg' ? ' aiml-sz-lg' : '';
+    btn.className = `aiml-trigger${this.config.position === 'left' ? ' aiml-left' : ''}${size}`;
     btn.setAttribute('aria-label', 'Open AI chat assistant');
     btn.setAttribute('aria-expanded', 'false');
     btn.setAttribute('aria-controls', 'aiml-chat-window');
+    const openIcon = this.config.launcherIconUrl
+      ? `<img class="aiml-trigger-img" src="${escAttr(this.config.launcherIconUrl)}" alt="" />`
+      : ICONS.chat;
     btn.innerHTML = `
-      <span class="aiml-icon-open" aria-hidden="true">${ICONS.chat}</span>
+      <span class="aiml-icon-open" aria-hidden="true">${openIcon}</span>
       <span class="aiml-icon-close" aria-hidden="true">${ICONS.close}</span>`;
     return btn;
+  }
+
+  // Teaser bubble next to the launcher ("Chat with us 👋"). Dismissed by opening the chat or its ×,
+  // and stays dismissed for the tab session so it never nags.
+  _buildLauncherLabel() {
+    const KEY = 'aiml_label_dismissed';
+    let dismissed = false;
+    try { dismissed = sessionStorage.getItem(KEY) === '1'; } catch {}
+    const div = document.createElement('div');
+    if (dismissed) return div;
+    div.className = `aiml-launcher-label${this.config.position === 'left' ? ' aiml-left' : ''}`;
+    div.innerHTML = `<span>${escHtml(this.config.launcherLabel)}</span>` +
+      `<button class="aiml-label-dismiss" aria-label="Dismiss">${ICONS.close}</button>`;
+    div.querySelector('span').addEventListener('click', () => this.open());
+    div.querySelector('.aiml-label-dismiss').addEventListener('click', (e) => {
+      e.stopPropagation();
+      div.remove();
+      try { sessionStorage.setItem(KEY, '1'); } catch {}
+    });
+    this._labelEl = div;
+    return div;
   }
 
   _buildWindow() {
@@ -64,9 +96,12 @@ export class WidgetUI {
     win.setAttribute('aria-label', 'AI Chat Assistant');
     win.setAttribute('aria-modal', 'false');
 
+    const avatar = this.config.avatarUrl
+      ? `<img class="aiml-avatar-img" src="${escAttr(this.config.avatarUrl)}" alt="" />`
+      : ICONS.bot;
     win.innerHTML = `
       <div class="aiml-header">
-        <div class="aiml-avatar" aria-hidden="true">${ICONS.bot}</div>
+        <div class="aiml-avatar" aria-hidden="true">${avatar}</div>
         <div class="aiml-header-info">
           <div class="aiml-header-title">${escAttr(this.config.title || 'AI Assistant')}</div>
           <div class="aiml-header-subtitle">${escAttr(this.config.subtitle || 'Ask me anything')}</div>
@@ -167,6 +202,7 @@ export class WidgetUI {
   open() {
     if (this.isOpen) return;
     this.isOpen = true;
+    if (this._labelEl) { this._labelEl.remove(); this._labelEl = null; }
     const win = this.shadow.querySelector('.aiml-window');
     const trigger = this.shadow.querySelector('.aiml-trigger');
     win.classList.remove('aiml-hidden');

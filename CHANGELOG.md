@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.1.0] — 2026-06-11
+
+### Added
+- **Appearance customization round** (all dashboard-configurable, with per-page `data-*` overrides):
+  header avatar image (`data-avatar`), custom launcher icon (`data-launcher-icon`), launcher size
+  presets (`data-launcher-size`: sm/md/lg), dismissible launcher teaser bubble (`data-launcher-label`),
+  corner-rounding presets (`data-radius`: none/md/xl), edge offsets (`data-offset-x`/`data-offset-y` —
+  clears cookie bars), `data-z-index`, one-time auto-open (`data-auto-open` seconds), and
+  `data-hide-mobile`.
+- `data-title`, `data-subtitle`, `data-greeting` embed overrides.
+
+### Fixed
+- **Dashboard appearance settings were silently ignored**: position, theme, and primary color were only
+  ever read from `data-*` attributes. Precedence is now explicit attribute → dashboard config → default,
+  per option — so the dashboard works, and embeds can still override.
+- Color and image inputs are validated (CSS color literals only; https-only image URLs).
+
 ## [1.0.0] — 2026-05-31
 
 ### Added

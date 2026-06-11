@@ -10,6 +10,8 @@
   --aiml-shadow: 0 20px 60px rgba(0,0,0,0.15), 0 4px 16px rgba(0,0,0,0.08);
   --aiml-font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --aiml-z: 2147483647;
+  --aiml-offset-x: 24px;
+  --aiml-offset-y: 24px;
   all: initial;
   font-family: var(--aiml-font);
   font-size: 14px;
@@ -22,8 +24,8 @@
 /* Trigger button */
 .aiml-trigger {
   position: fixed;
-  bottom: 24px;
-  right: 24px;
+  bottom: var(--aiml-offset-y);
+  right: var(--aiml-offset-x);
   width: 56px;
   height: 56px;
   border-radius: 50%;
@@ -47,8 +49,8 @@
 /* Chat window */
 .aiml-window {
   position: fixed;
-  bottom: 96px;
-  right: 24px;
+  bottom: calc(var(--aiml-offset-y) + 72px);
+  right: var(--aiml-offset-x);
   width: 380px;
   max-width: calc(100vw - 48px);
   height: 560px;
@@ -69,8 +71,47 @@
   transform: scale(0.95) translateY(8px);
   pointer-events: none;
 }
-.aiml-window.aiml-left { right: auto; left: 24px; transform-origin: bottom left; }
-.aiml-trigger.aiml-left { right: auto; left: 24px; }
+.aiml-window.aiml-left { right: auto; left: var(--aiml-offset-x); transform-origin: bottom left; }
+.aiml-trigger.aiml-left { right: auto; left: var(--aiml-offset-x); }
+
+/* Launcher size presets + custom icon */
+.aiml-trigger.aiml-sz-sm { width: 44px; height: 44px; }
+.aiml-trigger.aiml-sz-lg { width: 68px; height: 68px; }
+.aiml-trigger-img { width: 60%; height: 60%; object-fit: contain; border-radius: 50%; display: block; }
+
+/* Header avatar image (replaces the emoji when an avatar URL is configured) */
+.aiml-avatar-img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; display: block; }
+
+/* Launcher teaser label ("Chat with us 👋") */
+.aiml-launcher-label {
+  position: fixed;
+  bottom: calc(var(--aiml-offset-y) + 12px);
+  right: calc(var(--aiml-offset-x) + 68px);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--aiml-bg);
+  color: var(--aiml-text);
+  border: 1px solid var(--aiml-border);
+  border-radius: 999px;
+  padding: 8px 10px 8px 14px;
+  font-family: var(--aiml-font);
+  font-size: 13px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  z-index: var(--aiml-z);
+  cursor: pointer;
+  white-space: nowrap;
+  max-width: 260px;
+}
+.aiml-launcher-label span { overflow: hidden; text-overflow: ellipsis; }
+.aiml-launcher-label.aiml-left { right: auto; left: calc(var(--aiml-offset-x) + 68px); }
+.aiml-label-dismiss {
+  background: none; border: none; cursor: pointer; padding: 2px;
+  color: var(--aiml-text-muted); display: flex; align-items: center;
+}
+.aiml-label-dismiss svg { width: 12px; height: 12px; }
+/* The teaser crowds small screens — launcher alone is enough there. */
+@media (max-width: 640px) { .aiml-launcher-label { display: none; } }
 
 /* Header */
 .aiml-header {

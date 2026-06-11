@@ -2,7 +2,7 @@
 
 [![Build & Size Check](https://github.com/aimlchat/aiml-widget/actions/workflows/build.yml/badge.svg)](https://github.com/aimlchat/aiml-widget/actions/workflows/build.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Bundle size](https://img.shields.io/badge/gzipped-8.0KB-brightgreen)](dist/widget.js)
+[![Bundle size](https://img.shields.io/badge/gzipped-9.3KB-brightgreen)](dist/widget.js)
 
 Embeddable AI chat widget for any website. Add one script tag — visitors get an AI assistant that answers questions using only your site's content.
 
@@ -26,14 +26,31 @@ Get your API key at [aiml.chat](https://aiml.chat) (free tier available).
 
 ## Configuration
 
-All configuration is via `data-*` attributes on the script tag:
+Appearance is configured centrally in the [aiml.chat dashboard](https://aiml.chat) and fetched by the
+widget — change it there and every embed updates without touching code. `data-*` attributes are
+**per-page overrides**: an attribute set on the script tag wins over the dashboard value; an absent
+attribute inherits it.
 
 | Attribute | Values | Default | Description |
 |-----------|--------|---------|-------------|
 | `data-api-key` | string | — | **Required.** Your API key from the dashboard. |
+| `data-website-id` | string | — | Enables lead capture when the assistant can't answer. |
 | `data-position` | `right` \| `left` | `right` | Widget position. |
 | `data-theme` | `auto` \| `light` \| `dark` | `auto` | Colour scheme. |
-| `data-primary-color` | CSS colour | `#2563eb` | Override the primary accent colour. |
+| `data-primary-color` | CSS colour | `#2563eb` | Primary accent colour (hex/rgb/hsl). |
+| `data-title` | string | `AI Assistant` | Header title. |
+| `data-subtitle` | string | `Ask me anything` | Header subtitle. |
+| `data-greeting` | string | built-in | The assistant's opening message. |
+| `data-avatar` | https URL | 🤖 | Avatar image in the chat header. |
+| `data-launcher-icon` | https URL | chat icon | Custom image for the launcher button. |
+| `data-launcher-size` | `sm` \| `md` \| `lg` | `md` | Launcher button size. |
+| `data-launcher-label` | string | — | Teaser bubble next to the launcher ("Chat with us 👋"). Dismissible; hidden on mobile. |
+| `data-radius` | `none` \| `md` \| `xl` | `md` | Corner rounding of the chat window. |
+| `data-offset-x` | 0–400 (px) | `24` | Distance from the screen's side edge. |
+| `data-offset-y` | 0–400 (px) | `24` | Distance from the bottom edge (clears cookie bars). |
+| `data-z-index` | number | max | Stacking order override. |
+| `data-auto-open` | 0–600 (seconds) | `0` | Auto-open the chat once per visit after this delay. `0` = never. |
+| `data-hide-mobile` | `true` \| `false` | `false` | Don't render the widget on screens ≤ 640px. |
 | `data-api-url` | URL | `https://api.aiml.chat` | Override the API base URL (self-hosted). |
 | `data-suggested-questions` | pipe-separated strings | — | Up to 4 suggested questions shown on first open. |
 
