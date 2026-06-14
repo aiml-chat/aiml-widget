@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AIML widget · local test harness</title>
+  <style>
+    :root { --b: #4F46E5; --ink: #1c1917; --muted: #6b7280; --line: #e5e7eb; --bg: #faf9f7; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font: 15px/1.55 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+           color: var(--ink); background: var(--bg); }
+    .wrap { max-width: 760px; margin: 0 auto; padding: 40px 24px 120px; }
+    h1 { font-size: 26px; letter-spacing: -.01em; margin: 0 0 4px; }
+    p.sub { color: var(--muted); margin: 0 0 28px; }
+    .card { background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 22px; margin-bottom: 18px; }
+    label { display: block; font-size: 13px; font-weight: 600; margin: 0 0 6px; }
+    .hint { font-weight: 400; color: var(--muted); }
+    input, select { width: 100%; height: 40px; padding: 0 12px; font: inherit; font-size: 14px;
+            border: 1px solid var(--line); border-radius: 9px; background: #fff; color: var(--ink); }
+    input:focus, select:focus { outline: none; border-color: var(--b); box-shadow: 0 0 0 3px rgba(79,70,229,.15); }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .field { margin-bottom: 16px; }
+    .actions { display: flex; gap: 10px; margin-top: 4px; }
+    button { height: 42px; padding: 0 18px; font: inherit; font-weight: 600; border-radius: 9px; cursor: pointer; border: 1px solid transparent; }
+    .primary { background: var(--b); color: #fff; }
+    .primary:hover { filter: brightness(1.05); }
+    .ghost { background: #fff; border-color: var(--line); color: var(--ink); }
+    .ghost:hover { background: var(--bg); }
+    .status { font-size: 13px; padding: 10px 14px; border-radius: 9px; margin-top: 14px; display: none; }
+    .status.on { display: block; }
+    .status.ok { background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; }
+    .status.warn { background: #fffbeb; color: #b45309; border: 1px solid #fde68a; }
+    ul.check { margin: 6px 0 0; padding: 0 0 0 18px; color: #374151; }
+    ul.check li { margin: 6px 0; }
+    code { background: #f3f4f6; padding: 1px 6px; border-radius: 5px; font-size: 13px; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>AIML widget · local test harness</h1>
+    <p class="sub">Loads <code>./widget.js</code> against your local API to verify recommendations and source citations end-to-end.</p>
+
+    <div class="card">
+      <div class="field">
+        <label>API base URL <span class="hint">— local API (docker-compose maps it to 5001)</span></label>
+        <input id="apiUrl" class="mono" placeholder="http://localhost:5001" />
+      </div>
+      <div class="field">
+        <label>API key <span class="hint">— the <code>aiml_pk_…</code> from your website's Widget tab</span></label>
+        <input id="apiKey" class="mono" placeholder="aiml_pk_..." />
+      </div>
+      <div class="field">
+        <label>Website ID <span class="hint">— enables the lead-capture form on "no answer"</span></label>
+        <input id="websiteId" class="mono" placeholder="00000000-0000-0000-0000-000000000000" />
+      </div>
+      <div class="row">
+        <div class="field">
+          <label>Theme</label>
+          <select id="theme">
+            <option value="auto">auto</option>
+            <option value="light">light</option>
+            <option value="dark">dark</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Position</label>
+          <select id="position">
+            <option value="right">right</option>
+            <option value="left">left</option>
+          </select>
+        </div>
+      </div>
+      <div class="actions">
+        <button class="primary" id="load">Load / reload widget</button>
+        <button class="ghost" id="clear">Clear</button>
+      </div>
+      <div id="status" class="status"></div>
+    </div>
+
+    <div class="card">
+      <strong>What to verify</strong>
+      <ul class="check">
+        <li><strong>#4 Recommendations:</strong> open the chat bubble (bottom corner). The welcome screen should show <em>suggested-question chips</em>. With no manual ones set, these auto-fill from your site's real top answered questions (needs prior chat history).</li>
+        <li><strong>#5 Sources:</strong> ask a question that has indexed content. After the answer streams, a <em>“Sources”</em> block with clickable links should appear under it.</li>
+        <li>No content indexed yet → you'll get a “no answer” state (and a lead form if a Website ID is set). Index a site first via the dashboard.</li>
+      </ul>
+    </div>
+  </div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const KEY = 'aiml_harness_cfg';
+    const cfg = (() => { try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch { return {}; } })();
+
+    // Restore saved inputs
+    $('apiUrl').value = cfg.apiUrl || 'http://localhost:5001';
+    $('apiKey').value = cfg.apiKey || '';
+    $('websiteId').value = cfg.websiteId || '';
+    $('theme').value = cfg.theme || 'auto';
+    $('position').value = cfg.position || 'right';
+
+    function setStatus(msg, kind) {
+      const el = $('status');
+      el.textContent = msg;
+      el.className = 'status on ' + (kind || 'ok');
+    }
+
+    // If a config was saved AND we're flagged to autoload, inject the widget once.
+    if (cfg.autoload && cfg.apiKey) {
+      const s = document.createElement('script');
+      s.src = './widget.js';
+      s.setAttribute('data-api-key', cfg.apiKey);
+      if (cfg.websiteId) s.setAttribute('data-website-id', cfg.websiteId);
+      s.setAttribute('data-api-url', cfg.apiUrl || 'http://localhost:5001');
+      s.setAttribute('data-theme', cfg.theme || 'auto');
+      s.setAttribute('data-position', cfg.position || 'right');
+      s.async = true;
+      s.onerror = () => setStatus('Could not load ./widget.js — run `npm run build` in aiml-widget first.', 'warn');
+      document.body.appendChild(s);
+      setStatus('Widget loaded. Open the chat bubble in the ' + (cfg.position || 'right') + ' corner.', 'ok');
+    }
+
+    $('load').addEventListener('click', () => {
+      const next = {
+        apiUrl: $('apiUrl').value.trim(),
+        apiKey: $('apiKey').value.trim(),
+        websiteId: $('websiteId').value.trim(),
+        theme: $('theme').value,
+        position: $('position').value,
+        autoload: true,
+      };
+      if (!next.apiKey) { setStatus('Enter an API key first.', 'warn'); return; }
+      localStorage.setItem(KEY, JSON.stringify(next));
+      // The widget IIFE guards against double-init, so a full reload is the clean way to re-apply config.
+      location.reload();
+    });
+
+    $('clear').addEventListener('click', () => {
+      localStorage.removeItem(KEY);
+      location.reload();
+    });
+  </script>
+</body>
+</html>

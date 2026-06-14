@@ -1,5 +1,17 @@
 const esbuild = require('esbuild');
+const fs = require('fs');
 const watch = process.argv.includes('--watch');
+
+// Ship the manual test harness alongside the bundle so it's reachable when dist/ is the web root
+// (e.g. the nginx container at :8090/test-embed.html). The source lives at the repo root and points at
+// ./dist/widget.js; inside dist/, widget.js is a sibling, so rewrite the path on copy.
+function copyTestHarness() {
+  try {
+    const html = fs.readFileSync('test-embed.html', 'utf8')
+      .replace(/\.\/dist\/widget\.js/g, './widget.js');
+    fs.writeFileSync('dist/test-embed.html', html);
+  } catch { /* harness is optional */ }
+}
 
 const config = {
   entryPoints: ['src/widget.js'],
@@ -17,11 +29,12 @@ const config = {
 if (watch) {
   esbuild.context(config).then(ctx => {
     ctx.watch();
+    copyTestHarness();
     console.log('Watching for changes...');
   });
 } else {
   esbuild.build(config).then(() => {
-    const fs = require('fs');
+    copyTestHarness();
     const zlib = require('zlib');
     const buf = fs.readFileSync('dist/widget.js');
     zlib.gzip(buf, (err, result) => {
