@@ -13,6 +13,22 @@ function copyTestHarness() {
   } catch { /* harness is optional */ }
 }
 
+// CDN artifacts for serving dist/ as the web root of cdn.aiml.chat (e.g. Cloudflare Pages):
+//  - dist/v1/widget.js  → the production embed URL https://cdn.aiml.chat/v1/widget.js (versioned prefix).
+//  - dist/_headers      → Cloudflare Pages cache rules. Short browser cache + longer edge cache so a
+//    re-release of widget.js inside /v1 propagates without an aggressive immutable cache pinning old code.
+// Local dev still serves dist/widget.js at :8090/widget.js — this is purely additive. See DEPLOY.md.
+function emitCdnArtifacts() {
+  try {
+    fs.mkdirSync('dist/v1', { recursive: true });
+    fs.copyFileSync('dist/widget.js', 'dist/v1/widget.js');
+    fs.writeFileSync('dist/_headers',
+      '/v1/widget.js\n' +
+      '  Cache-Control: public, max-age=300, s-maxage=3600, stale-while-revalidate=86400\n' +
+      '  Access-Control-Allow-Origin: *\n');
+  } catch { /* optional */ }
+}
+
 const config = {
   entryPoints: ['src/widget.js'],
   bundle: true,
@@ -30,11 +46,13 @@ if (watch) {
   esbuild.context(config).then(ctx => {
     ctx.watch();
     copyTestHarness();
+    emitCdnArtifacts();
     console.log('Watching for changes...');
   });
 } else {
   esbuild.build(config).then(() => {
     copyTestHarness();
+    emitCdnArtifacts();
     const zlib = require('zlib');
     const buf = fs.readFileSync('dist/widget.js');
     zlib.gzip(buf, (err, result) => {
