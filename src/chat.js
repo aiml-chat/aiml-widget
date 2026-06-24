@@ -108,8 +108,10 @@ export class ChatClient {
             // human-in-the-loop write-confirm request + its resolution.
             if (parsed.agent !== undefined) callbacks.onAgent?.(parsed.agent);
             if (parsed.handoff) callbacks.onHandoff?.(parsed.handoff);
+            if (parsed.tool) callbacks.onTool?.(parsed.tool);
             if (parsed.confirm) callbacks.onConfirm?.(parsed.confirm);
             if (parsed.confirm_result) callbacks.onConfirmResult?.(parsed.confirm_result);
+            if (parsed.escalate) callbacks.onEscalate?.();
           } catch { /* ignore malformed line */ }
         }
       }

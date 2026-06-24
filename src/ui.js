@@ -8,6 +8,29 @@ const ICONS = {
   bot: '🤖',
 };
 
+// Agent-mode glyphs (Phase 10 D1) — small 12px stroke icons, drawn in the active agent's accent colour.
+const AICON = (p) => `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
+const GLYPH = {
+  msg:   AICON('<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>'),
+  spark: AICON('<path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2 2M16 16l2 2M18 6l-2 2M8 16l-2 2"/>'),
+  code:  AICON('<polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>'),
+  arrow: AICON('<line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>'),
+  shield: AICON('<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>'),
+  lock:  AICON('<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>'),
+  check: AICON('<polyline points="20 6 9 17 4 12"/>'),
+  loader: AICON('<line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="4.9" y1="4.9" x2="7.8" y2="7.8"/><line x1="16.2" y1="16.2" x2="19.1" y2="19.1"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/><line x1="4.9" y1="19.1" x2="7.8" y2="16.2"/><line x1="16.2" y1="7.8" x2="19.1" y2="4.9"/>'),
+  user:  AICON('<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>'),
+};
+
+// One quiet accent per agent (matches the design's AGENTS_DEFAULT).
+const AGENTS = {
+  Support:   { accent: '#4F46E5', icon: 'msg' },
+  Sales:     { accent: '#7C3AED', icon: 'spark' },
+  Technical: { accent: '#0F766E', icon: 'code' },
+};
+const AGENT_FALLBACK = { accent: '#78716C', icon: 'spark' };
+const agentMeta = (name) => AGENTS[name] || AGENT_FALLBACK;
+
 export class WidgetUI {
   constructor(config) {
     this.config = config;
@@ -20,6 +43,8 @@ export class WidgetUI {
     this._currentBotMsg = null;   // wrapper of the in-flight bot message (for the agent pill)
     this._lastAgent = null;       // current agent name, to detect a change → handoff
     this._confirmCards = {};       // pending-action id → its approval card element
+    this._toolGroup = null;        // active tool-activity group element for this turn
+    this._toolRows = {};           // tool call id → its row element
   }
 
   mount() {
@@ -245,6 +270,8 @@ export class WidgetUI {
     const messages = this.shadow.querySelector('.aiml-messages');
     this._streaming = true;
     this._streamBuffer = '';
+    this._toolGroup = null;
+    this._toolRows = {};
 
     // Show typing indicator
     const typing = document.createElement('div');
@@ -298,14 +325,18 @@ export class WidgetUI {
     // Tolerate both camelCase (current API) and PascalCase (older API / cached answers), and drop
     // any citation without a URL so we never render an "undefined" link.
     const sources = (citations || [])
-      .map(c => ({ url: c.sourceUrl || c.SourceUrl || '', title: c.title || c.Title || '' }))
+      .map(c => ({ url: c.sourceUrl || c.SourceUrl || '', title: c.title || c.Title || '', via: c.via || c.Via || '' }))
       .filter(c => c.url);
 
     if (this._streamingEl && sources.length) {
       const citDiv = document.createElement('div');
       citDiv.className = 'aiml-citations';
       citDiv.innerHTML = `<div class="aiml-citations-title">Sources</div>` +
-        sources.map(c => `<a class="aiml-citation-link" href="${escAttr(c.url)}" target="_blank" rel="noopener noreferrer" title="${escAttr(c.title || c.url)}">${escHtml(c.title || c.url)}</a>`).join('');
+        sources.map(c =>
+          `<a class="aiml-citation-link" href="${escAttr(c.url)}" target="_blank" rel="noopener noreferrer" title="${escAttr(c.title || c.url)}">` +
+          `${escHtml(c.title || c.url)}` +
+          (c.via ? `<span class="aiml-via">via ${escHtml(c.via)}</span>` : '') +
+          `</a>`).join('');
       this._streamingEl.appendChild(citDiv);
     }
 
@@ -321,64 +352,116 @@ export class WidgetUI {
     sendBtn.disabled = true;
   }
 
-  // ── Agent mode (Phase 10 D1) ──
+  // ── Agent mode (Phase 10 D1) — mirrors widget_agent.jsx ──
 
-  // Tag the in-flight bot message with the agent that produced it (e.g. "Support", "Sales").
+  // Tag the in-flight bot message with the agent that produced it, in that agent's accent colour.
   setAgent(name) {
     if (!name || !this.config.showAgentName) return;
     this._lastAgent = name;
     const host = this._currentBotMsg;
-    if (!host || host.querySelector('.aiml-agent-pill')) {
-      if (host && host.querySelector('.aiml-agent-pill'))
-        host.querySelector('.aiml-agent-pill').textContent = name;
-      return;
+    if (!host) return;
+    const meta = agentMeta(name);
+    let pill = host.querySelector('.aiml-agent-pill');
+    if (!pill) {
+      pill = document.createElement('span');
+      pill.className = 'aiml-agent-pill';
+      host.insertBefore(pill, host.firstChild);
     }
-    const pill = document.createElement('div');
-    pill.className = 'aiml-agent-pill';
-    pill.textContent = name;
-    host.insertBefore(pill, host.firstChild);
+    pill.style.setProperty('--ac', meta.accent);
+    pill.innerHTML = `<span class="aiml-agent-ico">${GLYPH[meta.icon]}</span>${escHtml(name)}`;
     this._scrollToBottom();
   }
 
-  // A mid-conversation transfer between agents, shown as a subtle divider.
+  // Labelled divider when control passes between agents, accented in the destination agent's colour.
   showHandoff(info) {
     const to = info && info.to;
     if (!to) return;
     this._lastAgent = to;
+    this._toolGroup = null; // a new agent starts a fresh tool group
+    const col = agentMeta(to).accent;
     const messages = this.shadow.querySelector('.aiml-messages');
     const div = document.createElement('div');
     div.className = 'aiml-handoff';
-    div.setAttribute('role', 'status');
-    div.innerHTML = `<span class="aiml-handoff-line"></span>` +
-      `<span class="aiml-handoff-text">Connected to ${escHtml(to)}</span>` +
-      `<span class="aiml-handoff-line"></span>`;
+    div.setAttribute('role', 'separator');
+    div.style.setProperty('--ac', col);
+    div.innerHTML =
+      `<div class="aiml-handoff-row">` +
+        `<span class="aiml-handoff-line"></span>` +
+        `<span class="aiml-handoff-pill">${GLYPH.arrow} Handed off to <b>${escHtml(to)}</b></span>` +
+        `<span class="aiml-handoff-line"></span>` +
+      `</div>` +
+      (info.reason ? `<span class="aiml-handoff-reason">${escHtml(info.reason)}</span>` : '');
     messages.appendChild(div);
     this._scrollToBottom();
   }
 
-  // Human-in-the-loop write confirmation: the agent wants to perform an action that changes data.
-  // Renders an approval card; onDecide(allow) is invoked with the visitor's choice.
+  // Live MCP tool activity: a running row flips to done; the group collapses to "Used N tools".
+  showTool(info) {
+    if (!info || !info.id) return;
+    const messages = this.shadow.querySelector('.aiml-messages');
+    if (!this._toolGroup) {
+      this._toolGroup = document.createElement('div');
+      this._toolGroup.className = 'aiml-tools';
+      this._toolGroup.setAttribute('role', 'status');
+      this._toolRows = {};
+      messages.appendChild(this._toolGroup);
+    }
+    const group = this._toolGroup;
+    let row = this._toolRows[info.id];
+    if (!row) {
+      row = document.createElement('div');
+      row.className = 'aiml-tool-row';
+      group.appendChild(row);
+      this._toolRows[info.id] = row;
+    }
+    const running = !info.done;
+    const ico = running
+      ? `<span class="aiml-tool-ico aiml-spin">${GLYPH.loader}</span>`
+      : `<span class="aiml-tool-ico aiml-ok">${GLYPH.check}</span>`;
+    const server = info.server
+      ? `<span class="aiml-server-tag">${escHtml(info.server)}</span>` : '';
+    row.innerHTML = `${ico}<span class="aiml-tool-label">${escHtml(info.label || info.name || 'Working')}${running ? '…' : ''}</span>${server}`;
+    // When all rows are done, collapse the group to a compact summary line.
+    const rows = Object.values(this._toolRows);
+    if (rows.length && rows.every((r) => r.querySelector('.aiml-ok'))) {
+      group.classList.add('aiml-tools-done');
+      const n = rows.length;
+      group.innerHTML = `<span class="aiml-tool-ico aiml-ok">${GLYPH.check}</span>` +
+        `<span class="aiml-tool-summary">Used ${n} tool${n > 1 ? 's' : ''}</span>`;
+      this._toolGroup = null; // finalize; a later call starts a new group
+    }
+    this._scrollToBottom();
+  }
+
+  // Human-in-the-loop write confirmation, accented in the active agent's colour.
   showConfirmCard(info, onDecide) {
     if (!info || !info.id) return;
+    this._toolGroup = null;
+    const col = agentMeta(this._lastAgent).accent;
     const messages = this.shadow.querySelector('.aiml-messages');
     const card = document.createElement('div');
     card.className = 'aiml-confirm';
     card.setAttribute('role', 'group');
+    card.style.setProperty('--ac', col);
+    const server = info.server
+      ? `<span class="aiml-server-tag">${escHtml(info.server)}</span>` : '';
     card.innerHTML =
-      `<div class="aiml-confirm-head">Approval needed</div>` +
+      `<div class="aiml-confirm-head"><span class="aiml-confirm-shield">${GLYPH.shield}</span>Approval needed${server ? `<span class="aiml-confirm-srv">${server}</span>` : ''}</div>` +
       `<div class="aiml-confirm-title">${escHtml(info.title || info.action || 'Perform this action?')}</div>` +
       (info.summary ? `<div class="aiml-confirm-summary">${escHtml(info.summary)}</div>` : '') +
       `<div class="aiml-confirm-actions">` +
-        `<button class="aiml-confirm-deny" type="button">No, don't</button>` +
-        `<button class="aiml-confirm-approve" type="button">Approve</button>` +
+        `<button class="aiml-confirm-approve" type="button">${GLYPH.check} Allow</button>` +
+        `<button class="aiml-confirm-deny" type="button">Not now</button>` +
       `</div>` +
+      `<div class="aiml-confirm-foot">${GLYPH.lock} Read-only by default — you approve every change.</div>` +
       `<div class="aiml-confirm-status aiml-hidden" role="status"></div>`;
 
     const decide = (allow) => {
       card.querySelector('.aiml-confirm-actions').classList.add('aiml-hidden');
+      card.querySelector('.aiml-confirm-foot').classList.add('aiml-hidden');
       const status = card.querySelector('.aiml-confirm-status');
       status.classList.remove('aiml-hidden');
-      status.textContent = allow ? 'Approving…' : 'Cancelled.';
+      status.textContent = allow ? 'Approving…' : 'Dismissed.';
       onDecide(allow);
     };
     card.querySelector('.aiml-confirm-approve').addEventListener('click', () => decide(true));
@@ -389,15 +472,33 @@ export class WidgetUI {
     this._scrollToBottom();
   }
 
-  // Resolution of a previously shown confirm card (executed or not).
+  // Resolution of a previously shown confirm card.
   showConfirmResult(info) {
     const card = info && this._confirmCards[info.id];
     if (!card) return;
     const status = card.querySelector('.aiml-confirm-status');
     status.classList.remove('aiml-hidden');
-    status.textContent = info.executed ? '✓ Done' : 'Not performed.';
-    card.classList.add('aiml-confirm-resolved');
+    status.innerHTML = info.executed
+      ? `<span class="aiml-ok">${GLYPH.check}</span> Allowed`
+      : 'Dismissed';
+    card.classList.add(info.executed ? 'aiml-confirm-ok' : 'aiml-confirm-resolved');
     delete this._confirmCards[info.id];
+    this._scrollToBottom();
+  }
+
+  // Passive escalation: offer a human handoff (opens the existing lead-capture form).
+  showEscalate(onTalk) {
+    const messages = this.shadow.querySelector('.aiml-messages');
+    if (messages.querySelector('.aiml-escalate')) return; // once per turn
+    const row = document.createElement('div');
+    row.className = 'aiml-escalate';
+    row.innerHTML =
+      `<span class="aiml-escalate-ico">${GLYPH.user}</span>` +
+      `<span class="aiml-escalate-text">Need a person? A teammate can take it from here.</span>` +
+      `<button class="aiml-escalate-btn" type="button">Talk to a human</button>`;
+    row.querySelector('.aiml-escalate-btn').addEventListener('click', () => { row.remove(); onTalk(); });
+    messages.appendChild(row);
+    this._scrollToBottom();
   }
 
   showStatus(type, message) {

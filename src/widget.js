@@ -174,8 +174,14 @@ import { WidgetUI } from './ui.js';
         // Agent-mode events (no-ops unless the API streams them).
         onAgent(name) { ui.setAgent(name); },
         onHandoff(info) { ui.showHandoff(info); },
+        onTool(info) { ui.showTool(info); },
         onConfirm(info) { ui.showConfirmCard(info, (allow) => sendApproval(info.id, allow)); },
         onConfirmResult(info) { ui.showConfirmResult(info); },
+        onEscalate() {
+          if (!websiteId) return;
+          ui.showEscalate(() => ui.showLeadCaptureForm(text,
+            (email, question) => client.captureLead(websiteId, email, question)));
+        },
         onNoAnswer() {
           // Honest deflection: close the bubble, then offer what we CAN help with + email capture.
           finalize([]);

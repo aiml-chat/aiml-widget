@@ -417,74 +417,187 @@
   --aiml-text-muted: #94a3b8;
 }
 
-/* ── Agent mode (Phase 10 D1) ── */
 
-/* Agent attribution pill above a bot message */
+/* ── Agent mode (Phase 10 D1) — mirrors widget_agent.jsx ── */
+@keyframes aiml-spin { to { transform: rotate(360deg); } }
+.aiml-spin { display: inline-flex; animation: aiml-spin 0.8s linear infinite; }
+.aiml-ok { color: #16A34A; display: inline-flex; }
+
+/* Agent attribution pill (accent via --ac) */
 .aiml-agent-pill {
   display: inline-flex;
   align-items: center;
+  gap: 5px;
   align-self: flex-start;
   margin: 0 0 4px 2px;
-  padding: 2px 9px;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.01em;
-  color: var(--aiml-primary);
-  background: color-mix(in srgb, var(--aiml-primary) 12%, transparent);
-  border: 1px solid color-mix(in srgb, var(--aiml-primary) 25%, transparent);
+  padding: 1px 8px 1px 5px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--ac, var(--aiml-primary));
+  background: color-mix(in srgb, var(--ac, var(--aiml-primary)) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ac, var(--aiml-primary)) 28%, transparent);
   border-radius: 999px;
+}
+.aiml-agent-ico {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px; height: 14px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ac, var(--aiml-primary)) 18%, transparent);
 }
 
 /* Handoff divider */
-.aiml-handoff {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin: 10px 4px;
-}
+.aiml-handoff { display: flex; flex-direction: column; align-items: center; gap: 3px; margin: 8px 4px; }
+.aiml-handoff-row { display: flex; align-items: center; gap: 8px; width: 100%; }
 .aiml-handoff-line { flex: 1; height: 1px; background: var(--aiml-border); }
-.aiml-handoff-text {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--aiml-text-muted);
+.aiml-handoff-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   white-space: nowrap;
+  padding: 3px 10px;
+  font-size: 10px;
+  font-weight: 500;
+  border-radius: 999px;
+  color: var(--aiml-text-muted);
+  background: color-mix(in srgb, var(--ac, var(--aiml-primary)) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ac, var(--aiml-primary)) 18%, transparent);
 }
+.aiml-handoff-pill svg { color: var(--ac, var(--aiml-primary)); }
+.aiml-handoff-pill b { color: var(--ac, var(--aiml-primary)); font-weight: 700; }
+.aiml-handoff-reason { font-size: 10px; font-style: italic; color: var(--aiml-text-muted); }
+
+/* Server provenance tag */
+.aiml-server-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  border-radius: 4px;
+  color: var(--aiml-text-muted);
+  background: color-mix(in srgb, var(--aiml-text) 6%, transparent);
+}
+
+/* Tool activity group */
+.aiml-tools {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-self: stretch;
+  margin: 4px 0;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--aiml-surface);
+  border: 1px solid var(--aiml-border);
+}
+.aiml-tools-done { flex-direction: row; align-items: center; gap: 6px; }
+.aiml-tool-row { display: flex; align-items: center; gap: 8px; font-size: 11.5px; color: var(--aiml-text); }
+.aiml-tool-ico { display: inline-flex; flex-shrink: 0; color: var(--aiml-text-muted); }
+.aiml-tool-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.aiml-tool-summary { font-size: 11.5px; font-weight: 500; color: var(--aiml-text-muted); }
 
 /* Write-confirm approval card */
 .aiml-confirm {
   align-self: stretch;
   margin: 6px 0;
   padding: 12px 14px;
-  background: var(--aiml-surface);
-  border: 1px solid var(--aiml-border);
-  border-left: 3px solid var(--aiml-primary);
-  border-radius: 10px;
+  background: var(--aiml-bg);
+  border: 1.5px solid color-mix(in srgb, var(--ac, var(--aiml-primary)) 45%, transparent);
+  border-radius: 12px;
+  box-shadow: 0 2px 10px color-mix(in srgb, var(--ac, var(--aiml-primary)) 12%, transparent);
 }
 .aiml-confirm-head {
+  display: flex;
+  align-items: center;
+  gap: 5px;
   font-size: 10px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: var(--aiml-primary);
-  margin-bottom: 4px;
+  color: var(--ac, var(--aiml-primary));
+  margin-bottom: 5px;
 }
-.aiml-confirm-title { font-size: 14px; font-weight: 600; color: var(--aiml-text); }
-.aiml-confirm-summary { font-size: 12.5px; color: var(--aiml-text-muted); margin-top: 4px; line-height: 1.45; }
+.aiml-confirm-shield { display: inline-flex; }
+.aiml-confirm-srv { margin-left: auto; }
+.aiml-confirm-title { font-size: 13px; font-weight: 600; color: var(--aiml-text); line-height: 1.35; }
+.aiml-confirm-summary { font-size: 11.5px; color: var(--aiml-text-muted); margin-top: 3px; line-height: 1.45; }
 .aiml-confirm-actions { display: flex; gap: 8px; margin-top: 10px; }
 .aiml-confirm-approve, .aiml-confirm-deny {
-  flex: 1;
-  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  height: 32px;
+  padding: 0 14px;
   font-family: var(--aiml-font);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
   border-radius: 8px;
   cursor: pointer;
-  border: 1px solid var(--aiml-border);
-  transition: filter .15s, background .15s;
+  transition: filter .15s, background .15s, color .15s;
 }
-.aiml-confirm-approve { background: var(--aiml-primary); color: #fff; border-color: transparent; }
-.aiml-confirm-approve:hover { filter: brightness(1.06); }
-.aiml-confirm-deny { background: var(--aiml-bg); color: var(--aiml-text-muted); }
+.aiml-confirm-approve {
+  background: var(--ac, var(--aiml-primary));
+  color: #fff;
+  border: none;
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--ac, var(--aiml-primary)) 40%, transparent);
+}
+.aiml-confirm-approve:hover { filter: brightness(1.07); }
+.aiml-confirm-deny {
+  background: transparent;
+  color: var(--aiml-text-muted);
+  border: 1px solid color-mix(in srgb, var(--ac, var(--aiml-primary)) 28%, transparent);
+}
 .aiml-confirm-deny:hover { color: var(--aiml-text); }
-.aiml-confirm-status { font-size: 12.5px; font-weight: 600; color: var(--aiml-text-muted); margin-top: 8px; }
+.aiml-confirm-foot {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  color: var(--aiml-text-muted);
+  margin-top: 8px;
+}
+.aiml-confirm-status { font-size: 12px; font-weight: 600; color: var(--aiml-text-muted); margin-top: 8px; display: flex; align-items: center; gap: 5px; }
+.aiml-confirm-ok { border-color: color-mix(in srgb, #16A34A 40%, transparent); }
+.aiml-confirm-ok .aiml-confirm-status { color: #15803D; }
 .aiml-confirm-resolved { opacity: 0.85; }
+
+/* Escalation row → talk to a human */
+.aiml-escalate {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  align-self: stretch;
+  margin: 6px 0;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: var(--aiml-surface);
+  border: 1px dashed var(--aiml-border);
+}
+.aiml-escalate-ico { display: inline-flex; color: var(--aiml-text-muted); flex-shrink: 0; }
+.aiml-escalate-text { flex: 1; font-size: 11.5px; color: var(--aiml-text); }
+.aiml-escalate-btn {
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+  height: 28px;
+  padding: 0 11px;
+  font-family: var(--aiml-font);
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 8px;
+  cursor: pointer;
+  color: var(--aiml-primary);
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--aiml-primary) 30%, transparent);
+  transition: background .15s;
+}
+.aiml-escalate-btn:hover { background: color-mix(in srgb, var(--aiml-primary) 8%, transparent); }
+
+/* Source provenance on citations */
+.aiml-via { margin-left: 6px; font-size: 9px; font-style: italic; opacity: 0.7; }
