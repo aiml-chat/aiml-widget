@@ -17,6 +17,9 @@ export class WidgetUI {
     this._streaming = false;
     this._streamingEl = null;
     this._streamBuffer = '';
+    this._currentBotMsg = null;   // wrapper of the in-flight bot message (for the agent pill)
+    this._lastAgent = null;       // current agent name, to detect a change → handoff
+    this._confirmCards = {};       // pending-action id → its approval card element
   }
 
   mount() {
@@ -278,6 +281,7 @@ export class WidgetUI {
       msg.innerHTML = `<div class="aiml-msg-bubble"></div>`;
       messages.appendChild(msg);
       this._streamingEl = msg.querySelector('.aiml-msg-bubble');
+      this._currentBotMsg = msg;
     }
 
     if (this._streamingEl) {
@@ -315,6 +319,85 @@ export class WidgetUI {
     input.focus();
     const sendBtn = this.shadow.querySelector('.aiml-send-btn');
     sendBtn.disabled = true;
+  }
+
+  // ── Agent mode (Phase 10 D1) ──
+
+  // Tag the in-flight bot message with the agent that produced it (e.g. "Support", "Sales").
+  setAgent(name) {
+    if (!name || !this.config.showAgentName) return;
+    this._lastAgent = name;
+    const host = this._currentBotMsg;
+    if (!host || host.querySelector('.aiml-agent-pill')) {
+      if (host && host.querySelector('.aiml-agent-pill'))
+        host.querySelector('.aiml-agent-pill').textContent = name;
+      return;
+    }
+    const pill = document.createElement('div');
+    pill.className = 'aiml-agent-pill';
+    pill.textContent = name;
+    host.insertBefore(pill, host.firstChild);
+    this._scrollToBottom();
+  }
+
+  // A mid-conversation transfer between agents, shown as a subtle divider.
+  showHandoff(info) {
+    const to = info && info.to;
+    if (!to) return;
+    this._lastAgent = to;
+    const messages = this.shadow.querySelector('.aiml-messages');
+    const div = document.createElement('div');
+    div.className = 'aiml-handoff';
+    div.setAttribute('role', 'status');
+    div.innerHTML = `<span class="aiml-handoff-line"></span>` +
+      `<span class="aiml-handoff-text">Connected to ${escHtml(to)}</span>` +
+      `<span class="aiml-handoff-line"></span>`;
+    messages.appendChild(div);
+    this._scrollToBottom();
+  }
+
+  // Human-in-the-loop write confirmation: the agent wants to perform an action that changes data.
+  // Renders an approval card; onDecide(allow) is invoked with the visitor's choice.
+  showConfirmCard(info, onDecide) {
+    if (!info || !info.id) return;
+    const messages = this.shadow.querySelector('.aiml-messages');
+    const card = document.createElement('div');
+    card.className = 'aiml-confirm';
+    card.setAttribute('role', 'group');
+    card.innerHTML =
+      `<div class="aiml-confirm-head">Approval needed</div>` +
+      `<div class="aiml-confirm-title">${escHtml(info.title || info.action || 'Perform this action?')}</div>` +
+      (info.summary ? `<div class="aiml-confirm-summary">${escHtml(info.summary)}</div>` : '') +
+      `<div class="aiml-confirm-actions">` +
+        `<button class="aiml-confirm-deny" type="button">No, don't</button>` +
+        `<button class="aiml-confirm-approve" type="button">Approve</button>` +
+      `</div>` +
+      `<div class="aiml-confirm-status aiml-hidden" role="status"></div>`;
+
+    const decide = (allow) => {
+      card.querySelector('.aiml-confirm-actions').classList.add('aiml-hidden');
+      const status = card.querySelector('.aiml-confirm-status');
+      status.classList.remove('aiml-hidden');
+      status.textContent = allow ? 'Approving…' : 'Cancelled.';
+      onDecide(allow);
+    };
+    card.querySelector('.aiml-confirm-approve').addEventListener('click', () => decide(true));
+    card.querySelector('.aiml-confirm-deny').addEventListener('click', () => decide(false));
+
+    this._confirmCards[info.id] = card;
+    messages.appendChild(card);
+    this._scrollToBottom();
+  }
+
+  // Resolution of a previously shown confirm card (executed or not).
+  showConfirmResult(info) {
+    const card = info && this._confirmCards[info.id];
+    if (!card) return;
+    const status = card.querySelector('.aiml-confirm-status');
+    status.classList.remove('aiml-hidden');
+    status.textContent = info.executed ? '✓ Done' : 'Not performed.';
+    card.classList.add('aiml-confirm-resolved');
+    delete this._confirmCards[info.id];
   }
 
   showStatus(type, message) {

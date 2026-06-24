@@ -53,6 +53,8 @@ attribute inherits it.
 | `data-hide-mobile` | `true` \| `false` | `false` | Don't render the widget on screens ≤ 640px. |
 | `data-api-url` | URL | `https://api.aiml.chat` | Override the API base URL (self-hosted). |
 | `data-suggested-questions` | pipe-separated strings | — | Up to 4 suggested questions shown on first open. |
+| `data-mode` | `agent` | — | Route to the site's **agent team** (Support / Sales / Technical) with handoffs and write-confirm, instead of plain RAG. Requires an agent-capable plan; the API gates and falls back automatically. |
+| `data-show-agent-name` | `true` \| `false` | `true` | In agent mode, show which agent answered as a pill above its replies. |
 
 ### Example with all options
 

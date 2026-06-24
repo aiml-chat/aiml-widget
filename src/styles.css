@@ -416,3 +416,75 @@
   --aiml-text: #f1f5f9;
   --aiml-text-muted: #94a3b8;
 }
+
+/* ── Agent mode (Phase 10 D1) ── */
+
+/* Agent attribution pill above a bot message */
+.aiml-agent-pill {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  margin: 0 0 4px 2px;
+  padding: 2px 9px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--aiml-primary);
+  background: color-mix(in srgb, var(--aiml-primary) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--aiml-primary) 25%, transparent);
+  border-radius: 999px;
+}
+
+/* Handoff divider */
+.aiml-handoff {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 10px 4px;
+}
+.aiml-handoff-line { flex: 1; height: 1px; background: var(--aiml-border); }
+.aiml-handoff-text {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--aiml-text-muted);
+  white-space: nowrap;
+}
+
+/* Write-confirm approval card */
+.aiml-confirm {
+  align-self: stretch;
+  margin: 6px 0;
+  padding: 12px 14px;
+  background: var(--aiml-surface);
+  border: 1px solid var(--aiml-border);
+  border-left: 3px solid var(--aiml-primary);
+  border-radius: 10px;
+}
+.aiml-confirm-head {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--aiml-primary);
+  margin-bottom: 4px;
+}
+.aiml-confirm-title { font-size: 14px; font-weight: 600; color: var(--aiml-text); }
+.aiml-confirm-summary { font-size: 12.5px; color: var(--aiml-text-muted); margin-top: 4px; line-height: 1.45; }
+.aiml-confirm-actions { display: flex; gap: 8px; margin-top: 10px; }
+.aiml-confirm-approve, .aiml-confirm-deny {
+  flex: 1;
+  height: 34px;
+  font-family: var(--aiml-font);
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 8px;
+  cursor: pointer;
+  border: 1px solid var(--aiml-border);
+  transition: filter .15s, background .15s;
+}
+.aiml-confirm-approve { background: var(--aiml-primary); color: #fff; border-color: transparent; }
+.aiml-confirm-approve:hover { filter: brightness(1.06); }
+.aiml-confirm-deny { background: var(--aiml-bg); color: var(--aiml-text-muted); }
+.aiml-confirm-deny:hover { color: var(--aiml-text); }
+.aiml-confirm-status { font-size: 12.5px; font-weight: 600; color: var(--aiml-text-muted); margin-top: 8px; }
+.aiml-confirm-resolved { opacity: 0.85; }

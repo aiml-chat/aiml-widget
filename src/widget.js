@@ -108,6 +108,10 @@ import { WidgetUI } from './ui.js';
       zIndex: intOr(attr('z-index') ?? serverConfig.zIndex, 2147483647, 1, 2147483647),
       autoOpenDelaySec: intOr(attr('auto-open') ?? serverConfig.autoOpenDelaySec, 0, 0, 600),
       hideOnMobile: (attr('hide-mobile') ?? String(serverConfig.hideOnMobile ?? false)) === 'true',
+      // Agent mode (Phase 10 D1): routes to the site's agent team (Support/Sales/Technical) with
+      // handoffs and write-confirm. Only effective if the plan allows it; the API gates and falls back.
+      agentMode: attr('mode') === 'agent' || serverConfig.mode === 'agent',
+      showAgentName: (attr('show-agent-name') ?? String(serverConfig.showAgentName ?? true)) !== 'false',
     };
 
     // Owner chose to keep the widget off small screens (e.g. it overlaps a mobile nav).
@@ -167,6 +171,11 @@ import { WidgetUI } from './ui.js';
         onCitations(citations) {
           finalize(citations);
         },
+        // Agent-mode events (no-ops unless the API streams them).
+        onAgent(name) { ui.setAgent(name); },
+        onHandoff(info) { ui.showHandoff(info); },
+        onConfirm(info) { ui.showConfirmCard(info, (allow) => sendApproval(info.id, allow)); },
+        onConfirmResult(info) { ui.showConfirmResult(info); },
         onNoAnswer() {
           // Honest deflection: close the bubble, then offer what we CAN help with + email capture.
           finalize([]);
@@ -195,8 +204,29 @@ import { WidgetUI } from './ui.js';
           };
           ui.showStatus('error', messages[type] || 'Something went wrong. Please try again.');
         },
-      });
+      }, { mode: uiConfig.agentMode ? 'agent' : undefined });
     });
+
+    // Two-turn write-confirm (Phase 10 D1): the visitor approved/denied a proposed action. Resolve it on
+    // the API and stream the outcome into a fresh bot message — no user text is sent.
+    async function sendApproval(actionId, allow) {
+      ui.startBotMessage();
+      let resp = '';
+      let done = false;
+      const fin = () => {
+        if (done) return;
+        done = true;
+        ui.finishBotMessage([]);
+        if (resp) { session.history.push({ role: 'assistant', content: resp }); saveSession(session); }
+      };
+      await client.send('', session.history, session.conversationId, session.visitorId, {
+        onToken(token) { resp += token; ui.appendToken(token); },
+        onCitations() { fin(); },
+        onConfirmResult(info) { ui.showConfirmResult(info); },
+        onDone() { fin(); },
+        onError() { ui.showStatus('error', 'Could not complete that action. Please try again.'); },
+      }, { mode: 'agent', approveActionId: actionId, approveAllow: allow });
+    }
 
     // Expose public API on window
     window.AIML = {

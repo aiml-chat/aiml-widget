@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.2.0] — 2026-06-24
+
+### Added
+- **Agent mode** (`data-mode="agent"`) — routes the conversation to the site's agent team
+  (Support / Sales / Technical) instead of plain RAG. The widget now renders the agent-mode SSE
+  vocabulary: an agent attribution pill (`data-show-agent-name`, on by default), a handoff divider
+  when the conversation is transferred between agents, and a human-in-the-loop **approval card** for
+  actions that change data (the two-turn write-confirm flow — Approve/Deny re-posts to resolve the
+  pending action and streams the result). All additive: a non-agent embed is byte-for-byte unchanged.
+- Bundle: 10.6 KB gzipped (budget 30 KB).
+
 ## [1.1.0] — 2026-06-11
 
 ### Added

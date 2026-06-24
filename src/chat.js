@@ -34,9 +34,10 @@ export class ChatClient {
    * @param {Array<{role:string,content:string}>} history
    * @param {string|null} conversationId
    * @param {string} visitorId
-   * @param {object} callbacks - { onToken, onCitations, onDone, onError }
+   * @param {object} callbacks - { onToken, onCitations, onDone, onError, onAgent, onHandoff, onConfirm, onConfirmResult }
+   * @param {object} [opts] - { mode, approveActionId, approveAllow } for agent mode (Phase 10 D1)
    */
-  async send(message, history, conversationId, visitorId, callbacks) {
+  async send(message, history, conversationId, visitorId, callbacks, opts = {}) {
     this.abort();
     this._abortController = new AbortController();
     const { signal } = this._abortController;
@@ -46,6 +47,11 @@ export class ChatClient {
       conversationId,
       visitorId,
       history: history.slice(-6), // last 3 turns
+      ...(opts.mode ? { mode: opts.mode } : {}),
+      // Two-turn write-confirm approval (no chat message; resolves a pending action).
+      ...(opts.approveActionId
+        ? { approveActionId: opts.approveActionId, approveAllow: !!opts.approveAllow }
+        : {}),
     });
 
     let response;
@@ -98,6 +104,12 @@ export class ChatClient {
             if (parsed.citations) callbacks.onCitations(parsed.citations);
             // Server found nothing relevant: offer related topics + email capture instead of a dead-end.
             if (parsed.noAnswer) callbacks.onNoAnswer?.();
+            // Agent-mode events (Phase 10 D1): which agent answered, a mid-conversation handoff, and the
+            // human-in-the-loop write-confirm request + its resolution.
+            if (parsed.agent !== undefined) callbacks.onAgent?.(parsed.agent);
+            if (parsed.handoff) callbacks.onHandoff?.(parsed.handoff);
+            if (parsed.confirm) callbacks.onConfirm?.(parsed.confirm);
+            if (parsed.confirm_result) callbacks.onConfirmResult?.(parsed.confirm_result);
           } catch { /* ignore malformed line */ }
         }
       }
