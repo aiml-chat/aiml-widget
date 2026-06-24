@@ -18,6 +18,7 @@ const GLYPH = {
   shield: AICON('<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>'),
   lock:  AICON('<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>'),
   check: AICON('<polyline points="20 6 9 17 4 12"/>'),
+  x: AICON('<circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>'),
   loader: AICON('<line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="4.9" y1="4.9" x2="7.8" y2="7.8"/><line x1="16.2" y1="16.2" x2="19.1" y2="19.1"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/><line x1="4.9" y1="19.1" x2="7.8" y2="16.2"/><line x1="16.2" y1="7.8" x2="19.1" y2="4.9"/>'),
   user:  AICON('<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>'),
 };
@@ -415,18 +416,23 @@ export class WidgetUI {
       this._toolRows[info.id] = row;
     }
     const running = !info.done;
+    const failed = info.done && info.ok === false;
     const ico = running
       ? `<span class="aiml-tool-ico aiml-spin">${GLYPH.loader}</span>`
-      : `<span class="aiml-tool-ico aiml-ok">${GLYPH.check}</span>`;
+      : failed
+        ? `<span class="aiml-tool-ico aiml-err aiml-done">${GLYPH.x}</span>`
+        : `<span class="aiml-tool-ico aiml-ok aiml-done">${GLYPH.check}</span>`;
     const server = info.server
       ? `<span class="aiml-server-tag">${escHtml(info.server)}</span>` : '';
     row.innerHTML = `${ico}<span class="aiml-tool-label">${escHtml(info.label || info.name || 'Working')}${running ? '…' : ''}</span>${server}`;
-    // When all rows are done, collapse the group to a compact summary line.
+    // When every row is done (succeeded or failed), collapse the group to a compact summary line.
     const rows = Object.values(this._toolRows);
-    if (rows.length && rows.every((r) => r.querySelector('.aiml-ok'))) {
+    if (rows.length && rows.every((r) => r.querySelector('.aiml-done'))) {
       group.classList.add('aiml-tools-done');
       const n = rows.length;
-      group.innerHTML = `<span class="aiml-tool-ico aiml-ok">${GLYPH.check}</span>` +
+      const anyErr = rows.some((r) => r.querySelector('.aiml-err'));
+      group.innerHTML =
+        `<span class="aiml-tool-ico ${anyErr ? 'aiml-err' : 'aiml-ok'}">${anyErr ? GLYPH.x : GLYPH.check}</span>` +
         `<span class="aiml-tool-summary">Used ${n} tool${n > 1 ? 's' : ''}</span>`;
       this._toolGroup = null; // finalize; a later call starts a new group
     }

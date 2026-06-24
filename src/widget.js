@@ -164,6 +164,9 @@ import { WidgetUI } from './ui.js';
       };
 
       await client.send(text, session.history.slice(0, -1), session.conversationId, session.visitorId, {
+        onConversation(id) {
+          if (id && session.conversationId !== id) { session.conversationId = id; saveSession(session); }
+        },
         onToken(token) {
           fullResponse += token;
           ui.appendToken(token);

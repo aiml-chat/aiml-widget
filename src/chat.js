@@ -100,6 +100,9 @@ export class ChatClient {
           if (data === '[DONE]') { callbacks.onDone(); return; }
           try {
             const parsed = JSON.parse(data);
+            // The server's conversation id — persist it so follow-up turns (incl. a write-confirm
+            // approval) continue the same conversation.
+            if (parsed.conversationId) callbacks.onConversation?.(parsed.conversationId);
             if (parsed.token !== undefined) callbacks.onToken(parsed.token);
             if (parsed.citations) callbacks.onCitations(parsed.citations);
             // Server found nothing relevant: offer related topics + email capture instead of a dead-end.

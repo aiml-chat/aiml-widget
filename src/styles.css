@@ -422,6 +422,7 @@
 @keyframes aiml-spin { to { transform: rotate(360deg); } }
 .aiml-spin { display: inline-flex; animation: aiml-spin 0.8s linear infinite; }
 .aiml-ok { color: #16A34A; display: inline-flex; }
+.aiml-err { color: #DC2626; display: inline-flex; }
 
 /* Agent attribution pill (accent via --ac) */
 .aiml-agent-pill {
