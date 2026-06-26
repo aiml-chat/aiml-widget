@@ -154,7 +154,7 @@ export class WidgetUI {
         </button>
       </div>
       <div class="aiml-footer${this.config.showBranding === false ? ' aiml-no-brand' : ''}">
-        <a class="aiml-badge" href="https://aiml.chat?ref=widget" target="_blank" rel="noopener noreferrer" tabindex="${this.config.showBranding === false ? '-1' : '0'}">
+        <a class="aiml-badge" href="https://aiml.chat/playground?ref=widget&site=${encodeURIComponent((location.hostname || '').replace(/^www\./, ''))}" target="_blank" rel="noopener noreferrer" tabindex="${this.config.showBranding === false ? '-1' : '0'}">
           Powered by aiml.chat
         </a>
       </div>`;
