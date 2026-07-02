@@ -109,8 +109,10 @@ import { WidgetUI } from './ui.js';
       autoOpenDelaySec: intOr(attr('auto-open') ?? serverConfig.autoOpenDelaySec, 0, 0, 600),
       hideOnMobile: (attr('hide-mobile') ?? String(serverConfig.hideOnMobile ?? false)) === 'true',
       // Agent mode (Phase 10 D1): routes to the site's agent team (Support/Sales/Technical) with
-      // handoffs and write-confirm. Only effective if the plan allows it; the API gates and falls back.
-      agentMode: attr('mode') === 'agent' || serverConfig.mode === 'agent',
+      // handoffs and write-confirm. Set via the embed (data-mode="agent") or the dashboard (the config
+      // endpoint serves the plan-gated effective mode as `assistantMode`). Only effective if the plan
+      // allows it; the API gates and falls back to RAG.
+      agentMode: attr('mode') === 'agent' || serverConfig.assistantMode === 'agent',
       showAgentName: (attr('show-agent-name') ?? String(serverConfig.showAgentName ?? true)) !== 'false',
     };
 
