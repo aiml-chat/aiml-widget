@@ -91,9 +91,11 @@ import { WidgetUI } from './ui.js';
       position: oneOf(attr('position'), ['left', 'right']) || serverConfig.position || 'right',
       theme: oneOf(attr('theme'), ['light', 'dark', 'auto']) || serverConfig.theme || 'auto',
       primaryColor: safeColor(attr('primary-color')) || safeColor(serverConfig.primaryColor) || null,
-      title: attr('title') || serverConfig.title || 'AI Assistant',
-      subtitle: attr('subtitle') || serverConfig.subtitle || 'Ask me anything',
-      placeholder: serverConfig.placeholder || 'Ask a question…',
+      // Title/placeholder defaults are mode-aware and owned by ui.js ("AI agent team" / "Message the
+      // team…" in agent mode) — only pass through what the owner explicitly configured.
+      title: attr('title') || serverConfig.title || null,
+      subtitle: attr('subtitle') || serverConfig.subtitle || null,
+      placeholder: serverConfig.placeholder || null,
       greeting: attr('greeting') || serverConfig.greeting || null,
       showBranding: serverConfig.showBranding !== false,
       suggestedQuestions,
@@ -128,20 +130,25 @@ import { WidgetUI } from './ui.js';
     // suggested-question chips into the chat area right away — visible the moment the visitor opens
     // the widget, so they never face a blank box and have to figure out what to type. Rendered on
     // mount (not on first open) so it's robust to the open/toggle path and to a persisted session.
-    ui.showGreeting(uiConfig.greeting || DEFAULT_GREETING);
-    ui.showSuggestedChips(uiConfig.suggestedQuestions, 'Try asking:');
+    // Agent mode without a custom greeting gets the design's team empty state instead of a bubble.
+    const renderWelcome = () => {
+      if (uiConfig.agentMode && !uiConfig.greeting) ui.showAgentWelcome();
+      else ui.showGreeting(uiConfig.greeting || DEFAULT_GREETING);
+      ui.showSuggestedChips(uiConfig.suggestedQuestions, 'Try asking:');
+    };
+    renderWelcome();
 
-    // Header overflow-menu hooks (agent mode). "Talk to a human" reuses the lead-capture form;
-    // "Clear conversation" also resets the server-side thread so the next turn starts fresh.
+    // Header overflow-menu hooks (agent mode). "Talk to a human" reuses the lead-capture form with
+    // its 'human' copy; "Clear conversation" also resets the server-side thread so the next turn
+    // starts fresh.
     ui.onTalkToHuman = websiteId
-      ? () => ui.showLeadCaptureForm('', (email, question) => client.captureLead(websiteId, email, question))
+      ? () => ui.showLeadCaptureForm('', (email, question) => client.captureLead(websiteId, email, question), 'human')
       : null;
     ui.onClear = () => {
       session.conversationId = null;
       session.history = [];
       saveSession(session);
-      ui.showGreeting(uiConfig.greeting || DEFAULT_GREETING);
-      ui.showSuggestedChips(uiConfig.suggestedQuestions, 'Try asking:');
+      renderWelcome();
     };
 
     // Proactive open, ONCE per tab session — a classic engagement pattern, but re-opening on every
@@ -198,7 +205,7 @@ import { WidgetUI } from './ui.js';
         onEscalate() {
           if (!websiteId) return;
           ui.showEscalate(() => ui.showLeadCaptureForm(text,
-            (email, question) => client.captureLead(websiteId, email, question)));
+            (email, question) => client.captureLead(websiteId, email, question), 'human'));
         },
         onNoAnswer() {
           // Honest deflection: close the bubble, then offer what we CAN help with + email capture.
@@ -217,12 +224,14 @@ import { WidgetUI } from './ui.js';
             });
             return;
           }
+          // Visitor-tone bubbles for the three states a visitor can actually hit through no fault of
+          // the site (design's ErrorBubble variants); everything else keeps the generic error strip.
+          if (type === 'network') { ui.showStatus('network', "Couldn't connect. Check your internet and try again."); return; }
+          if (type === 'rateLimit') { ui.showStatus('rate', "You've asked a lot! Try again in a moment."); return; }
+          if (type === 'quota') { ui.showStatus('quota', "This site's monthly limit has been reached."); return; }
           const messages = {
             auth:       'Authentication failed. Please check your API key.',
-            quota:      'Monthly message quota reached. Please upgrade your plan.',
-            rateLimit:  `Too many requests. Please wait ${extra || 60} seconds.`,
             noContent:  'No answer found. Please contact us directly.',
-            network:    'Connection error. Please check your network and try again.',
             stream:     'Stream interrupted. Please try again.',
             server:     'Server error. Please try again later.',
           };

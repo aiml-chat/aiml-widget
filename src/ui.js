@@ -10,6 +10,15 @@ const ICONS = {
   maximize: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>`,
   restore: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="14" y1="10" x2="21" y2="3"/><line x1="3" y1="21" x2="10" y2="14"/></svg>`,
   menu: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></svg>`,
+  sparkles: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3z"/><path d="M19 15l.7 2.3L22 18l-2.3.7L19 21l-.7-2.3L16 18l2.3-.7L19 15z"/></svg>`,
+};
+
+// 15px stroke icons for the error-bubble variants (design's ErrorBubble).
+const SICON = (p) => `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
+const STATUS_ICON = {
+  alert: SICON('<path d="M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>'),
+  clock: SICON('<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>'),
+  info:  SICON('<circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>'),
 };
 
 // Agent-mode glyphs (Phase 10 D1) — small 12px stroke icons, drawn in the active agent's accent colour.
@@ -312,8 +321,21 @@ export class WidgetUI {
     msg.setAttribute('aria-label', 'You');
     msg.innerHTML = `<div class="aiml-msg-bubble">${escHtml(text)}</div>`;
     messages.appendChild(msg);
+    this._stampTime(msg, true);
     this._scrollToBottom();
     return msg;
+  }
+
+  // Timestamp at message-GROUP ends: when the same role sends back-to-back, the previous stamp is
+  // absorbed so only the last message of the run carries the time.
+  _stampTime(afterEl, isUser) {
+    const roleCls = isUser ? 'aiml-time-user' : 'aiml-time-bot';
+    const prev = afterEl.previousElementSibling;
+    if (prev && prev.classList.contains('aiml-msg-time') && prev.classList.contains(roleCls)) prev.remove();
+    const t = document.createElement('div');
+    t.className = `aiml-msg-time ${roleCls}`;
+    t.textContent = new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    afterEl.insertAdjacentElement('afterend', t);
   }
 
   startBotMessage() {
@@ -369,6 +391,7 @@ export class WidgetUI {
 
   finishBotMessage(citations) {
     this._streaming = false;
+    const hadBubble = !!this._streamingEl; // false when the turn produced no tokens (e.g. error path)
 
     if (this._typingEl) { this._typingEl.remove(); this._typingEl = null; }
 
@@ -391,6 +414,7 @@ export class WidgetUI {
     }
 
     this._streamingEl = null;
+    if (hadBubble && this._currentBotMsg) this._stampTime(this._currentBotMsg, false);
     this._scrollToBottom();
 
     const input = this.shadow.querySelector('.aiml-input');
@@ -590,12 +614,20 @@ export class WidgetUI {
     const div = document.createElement('div');
     div.className = `aiml-status aiml-status-${type}`;
     div.setAttribute('role', 'alert');
-    div.textContent = message;
+    // Design's ErrorBubble variants: network / rate / quota get an icon + their own tone instead of
+    // the generic centered error strip.
+    const kindIcon = { network: 'alert', rate: 'clock', quota: 'info' }[type];
+    if (kindIcon) {
+      div.classList.add('aiml-status-kind');
+      div.innerHTML = `<span class="aiml-status-ico">${STATUS_ICON[kindIcon]}</span><span>${escHtml(message)}</span>`;
+    } else {
+      div.textContent = message;
+    }
     messages.appendChild(div);
     this._scrollToBottom();
 
     // Re-enable input on error
-    if (type === 'error' || type === 'warn') {
+    if (type === 'error' || type === 'warn' || kindIcon) {
       this._streaming = false;
       if (this._typingEl) { this._typingEl.remove(); this._typingEl = null; }
       const input = this.shadow.querySelector('.aiml-input');
@@ -603,6 +635,22 @@ export class WidgetUI {
       const sendBtn = this.shadow.querySelector('.aiml-send-btn');
       sendBtn.disabled = !input.value.trim();
     }
+  }
+
+  // Agent-mode empty state (design: sparkles roundel + team intro). Used instead of the greeting
+  // bubble when the owner hasn't set a custom greeting; the site's suggested-question chips render
+  // beneath it via showSuggestedChips. Removed on first send like the chips.
+  showAgentWelcome() {
+    const messages = this.shadow.querySelector('.aiml-messages');
+    const existing = messages.querySelector('.aiml-empty');
+    if (existing) existing.remove();
+    const div = document.createElement('div');
+    div.className = 'aiml-empty';
+    div.innerHTML =
+      `<span class="aiml-empty-ico" aria-hidden="true">${ICONS.sparkles}</span>` +
+      `<p class="aiml-empty-title">A team of agents, ready to help</p>` +
+      `<p class="aiml-empty-sub">Support, Sales &amp; Technical agents that use live tools — and ask before acting.</p>`;
+    messages.appendChild(div);
   }
 
   showGreeting(text) {
@@ -654,23 +702,30 @@ export class WidgetUI {
 
   hideWelcomeState() {
     const messages = this.shadow.querySelector('.aiml-messages');
-    const welcome = messages.querySelector('.aiml-welcome');
-    if (welcome) welcome.remove();
+    messages.querySelectorAll('.aiml-welcome, .aiml-empty').forEach((el) => el.remove());
   }
 
-  showLeadCaptureForm(question, onSubmit) {
+  // variant 'human' = the visitor asked for a person (overflow menu / escalation); default copy is
+  // the no-answer fallback.
+  showLeadCaptureForm(question, onSubmit, variant) {
     const messages = this.shadow.querySelector('.aiml-messages');
+    const human = variant === 'human';
     const form = document.createElement('div');
     form.className = 'aiml-lead-form';
     form.setAttribute('role', 'form');
     form.innerHTML = `
-      <p class="aiml-lead-text">I couldn't find an answer. Leave your email and we'll get back to you.</p>
+      ${human ? '<p class="aiml-lead-title">Connect with a human</p>' : ''}
+      <p class="aiml-lead-text">${human
+        ? 'Leave your email and a teammate will pick up this thread.'
+        : "I couldn't find an answer. Leave your email and we'll get back to you."}</p>
       <div class="aiml-lead-row">
-        <input class="aiml-lead-email" type="email" placeholder="your@email.com" aria-label="Your email address" />
-        <button class="aiml-lead-submit" type="button">Notify me</button>
+        <input class="aiml-lead-email" type="email" placeholder="you@email.com" aria-label="Your email address" />
+        <button class="aiml-lead-submit" type="button">${human ? 'Send' : 'Notify me'}</button>
       </div>
       <p class="aiml-lead-error aiml-hidden" role="alert">Please enter a valid email.</p>
-      <p class="aiml-lead-success aiml-hidden" role="status">Thanks! We'll be in touch.</p>`;
+      <p class="aiml-lead-success aiml-hidden" role="status">${human
+        ? 'Thanks — a teammate will email you shortly.'
+        : "Thanks! We'll be in touch."}</p>`;
 
     const emailInput = form.querySelector('.aiml-lead-email');
     const submitBtn = form.querySelector('.aiml-lead-submit');
