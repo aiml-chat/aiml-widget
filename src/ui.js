@@ -6,6 +6,10 @@ const ICONS = {
   close: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`,
   send: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>`,
   bot: '🤖',
+  minus: `<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>`,
+  maximize: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>`,
+  restore: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="14" y1="10" x2="21" y2="3"/><line x1="3" y1="21" x2="10" y2="14"/></svg>`,
+  menu: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></svg>`,
 };
 
 // Agent-mode glyphs (Phase 10 D1) — small 12px stroke icons, drawn in the active agent's accent colour.
@@ -128,23 +132,38 @@ export class WidgetUI {
     const avatar = this.config.avatarUrl
       ? `<img class="aiml-avatar-img" src="${escAttr(this.config.avatarUrl)}" alt="" />`
       : ICONS.bot;
+    // Agent mode gets the design's live-team header: pulsing status dot in the ACTIVE agent's accent,
+    // "AI agent team" identity, a live "Now: {agent}" line (updated from setAgent), an overflow menu
+    // (talk to a human / clear conversation), and a maximize control. RAG mode keeps the classic header.
+    const agent = !!this.config.agentMode;
+    const startAccent = agentMeta('Support').accent;
+    const title = this.config.title || (agent ? 'AI agent team' : 'AI Assistant');
+    const subtitle = agent
+      ? `Now: <span class="aiml-header-now" style="color:#fff">Support</span>`
+      : escHtml(this.config.subtitle || 'Ask me anything');
     win.innerHTML = `
       <div class="aiml-header">
-        <div class="aiml-avatar" aria-hidden="true">${avatar}</div>
+        ${agent
+          ? `<span class="aiml-header-dot-wrap" aria-hidden="true"><span class="aiml-header-dot" style="background:${startAccent}"></span><span class="aiml-header-dot aiml-header-ping" style="background:${startAccent}"></span></span>`
+          : `<div class="aiml-avatar" aria-hidden="true">${avatar}</div>`}
         <div class="aiml-header-info">
-          <div class="aiml-header-title">${escAttr(this.config.title || 'AI Assistant')}</div>
-          <div class="aiml-header-subtitle">${escAttr(this.config.subtitle || 'Ask me anything')}</div>
+          <div class="aiml-header-title">${escAttr(title)}</div>
+          <div class="aiml-header-subtitle">${subtitle}</div>
         </div>
-        <span class="aiml-label" title="Powered by AI">AI</span>
-        <button class="aiml-close-btn" aria-label="Close chat">
-          ${ICONS.close}
-        </button>
+        <span class="aiml-label" title="You are interacting with an AI">AI</span>
+        ${agent ? `<button class="aiml-hbtn aiml-menu-btn" aria-label="More options" aria-haspopup="true" aria-expanded="false" title="More">${ICONS.menu}</button>` : ''}
+        <button class="aiml-hbtn aiml-max-btn" aria-label="Full screen" title="Full screen">${ICONS.maximize}</button>
+        <button class="aiml-hbtn aiml-close-btn" aria-label="Minimize chat" title="Minimize">${ICONS.minus}</button>
+        <div class="aiml-menu aiml-hidden" role="menu">
+          <button class="aiml-menu-item aiml-menu-human" role="menuitem">${GLYPH.user} Talk to a human</button>
+          <button class="aiml-menu-item aiml-menu-clear" role="menuitem">${GLYPH.loader} Clear conversation</button>
+        </div>
       </div>
       <div class="aiml-messages" role="log" aria-live="polite" aria-label="Chat messages"></div>
       <div class="aiml-input-area">
         <textarea
           class="aiml-input"
-          placeholder="${escAttr(this.config.placeholder || 'Ask a question…')}"
+          placeholder="${escAttr(this.config.placeholder || (agent ? 'Message the team…' : 'Ask a question…'))}"
           rows="1"
           aria-label="Chat message input"
           aria-multiline="true"
@@ -171,6 +190,36 @@ export class WidgetUI {
 
     trigger.addEventListener('click', () => this.toggle());
     closeBtn.addEventListener('click', () => this.close());
+
+    // Maximize toggles a near-viewport window; icon swaps to "restore".
+    const maxBtn = shadow.querySelector('.aiml-max-btn');
+    maxBtn.addEventListener('click', () => {
+      const win = shadow.querySelector('.aiml-window');
+      const maxed = win.classList.toggle('aiml-maximized');
+      maxBtn.innerHTML = maxed ? ICONS.restore : ICONS.maximize;
+      maxBtn.title = maxed ? 'Exit full screen' : 'Full screen';
+      maxBtn.setAttribute('aria-label', maxBtn.title);
+    });
+
+    // Agent-mode overflow menu: talk to a human (host wires the lead form), clear conversation.
+    const menuBtn = shadow.querySelector('.aiml-menu-btn');
+    if (menuBtn) {
+      const menu = shadow.querySelector('.aiml-menu');
+      const setOpen = (open) => {
+        menu.classList.toggle('aiml-hidden', !open);
+        menuBtn.setAttribute('aria-expanded', String(open));
+      };
+      menuBtn.addEventListener('click', (e) => { e.stopPropagation(); setOpen(menu.classList.contains('aiml-hidden')); });
+      shadow.addEventListener('click', (e) => { if (!menu.contains(e.target) && e.target !== menuBtn) setOpen(false); });
+      menu.querySelector('.aiml-menu-human').addEventListener('click', () => {
+        setOpen(false);
+        if (this.onTalkToHuman) this.onTalkToHuman();
+      });
+      menu.querySelector('.aiml-menu-clear').addEventListener('click', () => {
+        setOpen(false);
+        this.clearConversation();
+      });
+    }
 
     input.addEventListener('input', () => {
       sendBtn.disabled = !input.value.trim();
@@ -353,15 +402,37 @@ export class WidgetUI {
     sendBtn.disabled = true;
   }
 
+  // Wipe the thread (overflow-menu "Clear conversation"): drop all messages and any in-flight
+  // stream state, then re-show the greeting so the window isn't left blank.
+  clearConversation() {
+    const messages = this.shadow.querySelector('.aiml-messages');
+    if (messages) messages.innerHTML = '';
+    this._streaming = false;
+    this._streamingEl = null;
+    this._streamBuffer = '';
+    this._currentBotMsg = null;
+    this._toolGroup = null;
+    this._toolRows = {};
+    this._confirmCards = {};
+    // The host's onClear resets the server-side session and re-renders the greeting; the fallback
+    // only covers a UI used without a host wiring.
+    if (this.onClear) this.onClear();
+    else if (this.config.greeting) this.showGreeting(this.config.greeting);
+  }
+
   // ── Agent mode (Phase 10 D1) — mirrors widget_agent.jsx ──
 
   // Tag the in-flight bot message with the agent that produced it, in that agent's accent colour.
   setAgent(name) {
     if (!name || !this.config.showAgentName) return;
     this._lastAgent = name;
+    // Keep the header honest about who's talking: recolor the status dot and the "Now:" line.
+    const meta = agentMeta(name);
+    this.shadow.querySelectorAll('.aiml-header-dot').forEach((d) => { d.style.background = meta.accent; });
+    const nowEl = this.shadow.querySelector('.aiml-header-now');
+    if (nowEl) nowEl.textContent = name; // name stays white — the dot carries the accent
     const host = this._currentBotMsg;
     if (!host) return;
-    const meta = agentMeta(name);
     let pill = host.querySelector('.aiml-agent-pill');
     if (!pill) {
       pill = document.createElement('span');
@@ -380,6 +451,10 @@ export class WidgetUI {
     this._lastAgent = to;
     this._toolGroup = null; // a new agent starts a fresh tool group
     const col = agentMeta(to).accent;
+    // The header follows the handoff too.
+    this.shadow.querySelectorAll('.aiml-header-dot').forEach((d) => { d.style.background = col; });
+    const nowEl = this.shadow.querySelector('.aiml-header-now');
+    if (nowEl) nowEl.textContent = to; // name stays white — the dot carries the accent
     const messages = this.shadow.querySelector('.aiml-messages');
     const div = document.createElement('div');
     div.className = 'aiml-handoff';

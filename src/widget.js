@@ -131,6 +131,19 @@ import { WidgetUI } from './ui.js';
     ui.showGreeting(uiConfig.greeting || DEFAULT_GREETING);
     ui.showSuggestedChips(uiConfig.suggestedQuestions, 'Try asking:');
 
+    // Header overflow-menu hooks (agent mode). "Talk to a human" reuses the lead-capture form;
+    // "Clear conversation" also resets the server-side thread so the next turn starts fresh.
+    ui.onTalkToHuman = websiteId
+      ? () => ui.showLeadCaptureForm('', (email, question) => client.captureLead(websiteId, email, question))
+      : null;
+    ui.onClear = () => {
+      session.conversationId = null;
+      session.history = [];
+      saveSession(session);
+      ui.showGreeting(uiConfig.greeting || DEFAULT_GREETING);
+      ui.showSuggestedChips(uiConfig.suggestedQuestions, 'Try asking:');
+    };
+
     // Proactive open, ONCE per tab session — a classic engagement pattern, but re-opening on every
     // navigation is the fastest way to get the widget uninstalled.
     if (uiConfig.autoOpenDelaySec > 0 && !session.autoOpened) {

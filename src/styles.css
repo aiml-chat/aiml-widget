@@ -154,6 +154,44 @@
 .aiml-close-btn:hover { background: rgba(255,255,255,0.15); color: #fff; }
 .aiml-close-btn:focus-visible { outline: 2px solid rgba(255,255,255,0.6); }
 
+/* Header chrome (agent mode + maximize) — mirrors the design's WidgetWindow header */
+.aiml-header { position: relative; }
+.aiml-hbtn {
+  background: none; border: none; color: rgba(255,255,255,0.8);
+  cursor: pointer; padding: 4px; border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.15s, color 0.15s;
+  flex-shrink: 0;
+}
+.aiml-hbtn:hover { background: rgba(255,255,255,0.15); color: #fff; }
+.aiml-hbtn:focus-visible { outline: 2px solid rgba(255,255,255,0.6); }
+.aiml-header-dot-wrap { position: relative; width: 12px; height: 12px; flex-shrink: 0; display: inline-flex; }
+/* The header is tinted with --aiml-primary, so the agent accent needs a white ring to read. */
+.aiml-header-dot { position: absolute; inset: 1px; border-radius: 50%; transition: background 0.3s; box-shadow: 0 0 0 2px rgba(255,255,255,0.85); }
+.aiml-header-ping { box-shadow: none; }
+.aiml-header-ping { animation: aiml-ping 1.6s cubic-bezier(0,0,0.2,1) infinite; opacity: 0.45; }
+@keyframes aiml-ping { 0% { transform: scale(1); opacity: 0.45; } 75%, 100% { transform: scale(2.4); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .aiml-header-ping { animation: none; opacity: 0; } }
+.aiml-header-now { font-weight: 600; }
+.aiml-menu {
+  position: absolute; top: 100%; right: 12px; margin-top: 4px; z-index: 30;
+  min-width: 190px; padding: 4px;
+  background: var(--aiml-bg, #fff); color: var(--aiml-text, #1C1917);
+  border: 1px solid rgba(0,0,0,0.1); border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(28,25,23,0.18);
+}
+.aiml-menu-item {
+  width: 100%; display: flex; align-items: center; gap: 8px;
+  background: none; border: none; cursor: pointer; text-align: left;
+  font: inherit; font-size: 13px; color: inherit;
+  padding: 8px 10px; border-radius: 7px;
+}
+.aiml-menu-item:hover { background: rgba(0,0,0,0.06); }
+.aiml-window.aiml-maximized {
+  width: min(560px, calc(100vw - 32px));
+  height: min(760px, calc(100vh - 32px));
+}
+
 /* Messages */
 .aiml-messages {
   flex: 1;
