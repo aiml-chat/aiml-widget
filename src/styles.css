@@ -196,6 +196,7 @@
 .aiml-messages {
   flex: 1;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 16px;
   display: flex;
   flex-direction: column;
@@ -205,20 +206,27 @@
 .aiml-messages::-webkit-scrollbar { width: 4px; }
 .aiml-messages::-webkit-scrollbar-thumb { background: var(--aiml-border); border-radius: 2px; }
 
+/* Column so the agent pill sits ABOVE the bubble (design) and, critically, so long content (code
+   blocks, unbroken strings) can never force the bubble past the window — width is the cross axis,
+   max-width wins, and <pre> scrolls internally instead of the whole messages area. */
 .aiml-msg {
   display: flex;
-  gap: 8px;
+  flex-direction: column;
+  align-items: flex-start;
   max-width: 88%;
+  min-width: 0;
   animation: aiml-fade-in 0.2s ease;
 }
 @keyframes aiml-fade-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
-.aiml-msg-user { align-self: flex-end; flex-direction: row-reverse; }
+.aiml-msg-user { align-self: flex-end; align-items: flex-end; }
 .aiml-msg-bubble {
   padding: 10px 14px;
   border-radius: 16px;
   font-size: 14px;
   line-height: 1.5;
   word-break: break-word;
+  max-width: 100%;
+  min-width: 0;
 }
 .aiml-msg-user .aiml-msg-bubble {
   background: var(--aiml-primary);

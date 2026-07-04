@@ -17,11 +17,13 @@ export function renderMarkdown(text) {
 
   // Bold **text** or __text__
   html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-  html = html.replace(/__(.+?)__/g, '<strong>$1</strong>');
+  // Underscore emphasis only at word boundaries — snake_case identifiers (YOUR_WEBSITE_ID,
+  // api_key) must render literally, matching CommonMark's no-intraword-underscore rule.
+  html = html.replace(/(^|[\s(])__(?!\s)(.+?)__(?=$|[\s.,;:!?)])/gm, '$1<strong>$2</strong>');
 
   // Italic *text* or _text_
   html = html.replace(/\*([^*\n]+)\*/g, '<em>$1</em>');
-  html = html.replace(/_([^_\n]+)_/g, '<em>$1</em>');
+  html = html.replace(/(^|[\s(])_(?!\s)([^_\n]+)_(?=$|[\s.,;:!?)])/gm, '$1<em>$2</em>');
 
   // Links [text](url)
   html = html.replace(/\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g,

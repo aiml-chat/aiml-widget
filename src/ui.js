@@ -295,7 +295,12 @@ export class WidgetUI {
     win.classList.remove('aiml-hidden');
     trigger.setAttribute('aria-expanded', 'true');
     trigger.setAttribute('aria-label', 'Close AI chat assistant');
-    setTimeout(() => this.shadow.querySelector('.aiml-input')?.focus(), 100);
+    // Only autofocus when this document actually has focus. Inside a background iframe (e.g. the
+    // dashboard's live preview, which rebuilds while the owner types in the settings form) a focus()
+    // here would STEAL page focus from whatever the user is doing.
+    setTimeout(() => {
+      if (document.hasFocus()) this.shadow.querySelector('.aiml-input')?.focus();
+    }, 100);
     if (this.config.onOpen) this.config.onOpen();
   }
 
