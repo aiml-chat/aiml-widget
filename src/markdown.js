@@ -85,6 +85,25 @@ export function renderMarkdown(text) {
     .replace(/\n{2,}/g, '\n');
 }
 
+/**
+ * Remove the inline [n] source markers the model emits (e.g. "… approved [1][2][3]."). The backend uses
+ * them to build the Sources list shown beneath the answer, but in the visible text they're dead, unlinked,
+ * and don't line up with the de-duplicated sources (so an answer can read "[3]" with a single source). We
+ * hide them and let the Sources list carry attribution.
+ *
+ * Only strips a marker that isn't glued to a letter/digit, so genuine bracketed text — arr[3], [2024] —
+ * survives (citations always follow a space or punctuation). The trailing-opener pass keeps a marker that
+ * streams in split ("… [2" before its "]") from flashing on screen; on a complete buffer it's a no-op.
+ */
+export function stripCitations(text) {
+  if (!text) return text;
+  // 1–2 digits only: citations index the top-K retrieved chunks (K≈5), so real markers are [1]–[5].
+  // Capping the width leaves longer bracketed numbers — years like [2024], refs like [12345] — untouched.
+  return text
+    .replace(/[ \t]*(?<![A-Za-z0-9])\[\d{1,2}\](?:[ \t]*\[\d{1,2}\])*/g, '')
+    .replace(/[ \t]*(?<![A-Za-z0-9])\[\d{0,2}$/g, '');
+}
+
 function escapeHtml(str) {
   return str
     .replace(/&/g, '&amp;')
