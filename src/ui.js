@@ -410,11 +410,17 @@ export class WidgetUI {
       const citDiv = document.createElement('div');
       citDiv.className = 'aiml-citations';
       citDiv.innerHTML = `<div class="aiml-citations-title">Sources</div>` +
-        sources.map(c =>
-          `<a class="aiml-citation-link" href="${escAttr(c.url)}" target="_blank" rel="noopener noreferrer" title="${escAttr(c.title || c.url)}">` +
-          `${escHtml(c.title || c.url)}` +
-          (c.via ? `<span class="aiml-via">via ${escHtml(c.via)}</span>` : '') +
-          `</a>`).join('');
+        sources.map(c => {
+          // Only http(s) sources are real links. Uploaded files, pasted text, and MCP resources carry
+          // synthetic aiml:// identifiers — there's nothing to navigate to, so render them as plain,
+          // non-clickable text (never expose the aiml:// string). Keeps attribution without a dead link.
+          const isWeb = /^https?:\/\//i.test(c.url);
+          const label = c.title || (isWeb ? c.url : 'Source');
+          const via = c.via ? `<span class="aiml-via">via ${escHtml(c.via)}</span>` : '';
+          return isWeb
+            ? `<a class="aiml-citation-link" href="${escAttr(c.url)}" target="_blank" rel="noopener noreferrer" title="${escAttr(label)}">${escHtml(label)}${via}</a>`
+            : `<span class="aiml-citation-link aiml-citation-static" title="${escAttr(label)}">${escHtml(label)}${via}</span>`;
+        }).join('');
       this._streamingEl.appendChild(citDiv);
     }
 

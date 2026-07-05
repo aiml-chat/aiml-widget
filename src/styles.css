@@ -285,6 +285,9 @@
   padding: 1px 0;
 }
 .aiml-citation-link:hover { text-decoration: underline; }
+/* Non-web source (uploaded file, pasted text, MCP resource): attribution only, nothing to click. */
+.aiml-citation-static { color: var(--aiml-text); opacity: 0.75; cursor: default; }
+.aiml-citation-static:hover { text-decoration: none; }
 
 /* Typing indicator */
 .aiml-typing { display: flex; gap: 4px; padding: 10px 14px; align-items: center; }
