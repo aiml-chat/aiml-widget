@@ -3,13 +3,16 @@
   "version": "1.2.0",
   "description": "Embeddable AI chat widget for any website",
   "license": "MIT",
+  "type": "module",
   "scripts": {
-    "build": "node build.js",
-    "build:watch": "node build.js --watch",
-    "size": "node -e \"const fs=require('fs');const z=require('zlib');const b=fs.readFileSync('dist/widget.js');z.gzip(b,(e,r)=>{console.log(r.length+' bytes gzipped');})\""
+    "build": "node build.cjs",
+    "build:watch": "node build.cjs --watch",
+    "test": "node --import ./tests/register-css-stub.mjs --test tests/**/*.test.mjs",
+    "size": "node size.cjs"
   },
   "devDependencies": {
-    "esbuild": "^0.28.0"
+    "esbuild": "^0.28.0",
+    "jsdom": "^29.1.1"
   },
   "files": [
     "dist/"

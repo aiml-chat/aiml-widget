@@ -1,11 +1,11 @@
-name: Build & Size Check
+name: Widget CI
 
 on:
-  push:
+  pull_request:
     branches: [main]
 
 jobs:
-  build:
+  ci:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -16,10 +16,7 @@ jobs:
       - run: npm ci
       - name: Build
         run: npm run build
+      - name: Test
+        run: npm test
       - name: Bundle size report
         run: npm run size
-      - name: Upload dist
-        uses: actions/upload-artifact@v4
-        with:
-          name: widget-dist
-          path: dist/

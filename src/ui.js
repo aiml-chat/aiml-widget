@@ -59,6 +59,9 @@ export class WidgetUI {
     this._confirmCards = {};       // pending-action id → its approval card element
     this._toolGroup = null;        // active tool-activity group element for this turn
     this._toolRows = {};           // tool call id → its row element
+    this._typingLabelEl = null;    // text label inside the typing indicator
+    this._caretEl = null;          // blinking caret at end of streamed text
+    this._renderTimer = null;      // debounced stream render timeout
   }
 
   mount() {
@@ -83,6 +86,12 @@ export class WidgetUI {
     overrides.push(`--aiml-offset-y: ${this.config.offsetY ?? 24}px;`);
     if (this.config.zIndex) overrides.push(`--aiml-z: ${this.config.zIndex};`);
     style.textContent += `:host { ${overrides.join(' ')} }`;
+
+    // Apply embeddable appearance classes based on owner config.
+    const hostCls = ['aiml-widget-host'];
+    if (this.config.headerStyle === 'solid') hostCls.push('aiml-header-solid');
+    if (this.config.bubbleStyle === 'flat') hostCls.push('aiml-bubbles-flat');
+    this.host.className = hostCls.join(' ');
 
     this.shadow.appendChild(this._buildTrigger());
     if (this.config.launcherLabel) this.shadow.appendChild(this._buildLauncherLabel());
@@ -148,7 +157,7 @@ export class WidgetUI {
     const startAccent = agentMeta('Support').accent;
     const title = this.config.title || (agent ? 'AI agent team' : 'AI Assistant');
     const subtitle = agent
-      ? `Now: <span class="aiml-header-now" style="color:#fff">Support</span>`
+      ? `Now: <span class="aiml-header-now">Support</span>`
       : escHtml(this.config.subtitle || 'Ask me anything');
     win.innerHTML = `
       <div class="aiml-header">
@@ -159,7 +168,7 @@ export class WidgetUI {
           <div class="aiml-header-title">${escAttr(title)}</div>
           <div class="aiml-header-subtitle">${subtitle}</div>
         </div>
-        <span class="aiml-label" title="You are interacting with an AI">AI</span>
+        ${this.config.showAiBadge !== false ? `<span class="aiml-label" title="You are interacting with an AI">AI</span>` : ''}
         ${agent ? `<button class="aiml-hbtn aiml-menu-btn" aria-label="More options" aria-haspopup="true" aria-expanded="false" title="More">${ICONS.menu}</button>` : ''}
         <button class="aiml-hbtn aiml-max-btn" aria-label="Full screen" title="Full screen">${ICONS.maximize}</button>
         <button class="aiml-hbtn aiml-close-btn" aria-label="Minimize chat" title="Minimize">${ICONS.minus}</button>
@@ -272,9 +281,10 @@ export class WidgetUI {
 
       if (!focusable.length) return;
       const first = focusable[0], last = focusable[focusable.length - 1];
-      if (e.shiftKey && document.activeElement === first) {
+      const active = shadow.activeElement;
+      if (e.shiftKey && active === first) {
         e.preventDefault(); last.focus();
-      } else if (!e.shiftKey && document.activeElement === last) {
+      } else if (!e.shiftKey && active === last) {
         e.preventDefault(); first.focus();
       }
     });
@@ -350,16 +360,17 @@ export class WidgetUI {
     this._toolGroup = null;
     this._toolRows = {};
 
-    // Show typing indicator
+    // Show contextual typing indicator (label + single pulsing orb).
     const typing = document.createElement('div');
     typing.className = 'aiml-msg aiml-msg-bot aiml-typing-indicator';
-    typing.setAttribute('aria-label', 'AI is typing');
-    typing.innerHTML = `<div class="aiml-msg-bubble"><div class="aiml-typing"><span></span><span></span><span></span></div></div>`;
+    typing.setAttribute('aria-label', this._typingLabel());
+    typing.innerHTML = `<div class="aiml-msg-bubble"><div class="aiml-typing"><span class="aiml-typing-orb" aria-hidden="true"></span><span class="aiml-typing-label">${escHtml(this._typingLabel())}</span></div></div>`;
     messages.appendChild(typing);
     this._scrollToBottom();
 
     this._streamingEl = null;
     this._typingEl = typing;
+    this._typingLabelEl = typing.querySelector('.aiml-typing-label');
 
     const input = this.shadow.querySelector('.aiml-input');
     const sendBtn = this.shadow.querySelector('.aiml-send-btn');
@@ -367,6 +378,33 @@ export class WidgetUI {
     sendBtn.disabled = true;
 
     return { typing };
+  }
+
+  // Contextual label for the typing indicator. In agent mode it names the active agent;
+  // during live tool calls it says what is happening so the visitor isn't staring at silence.
+  _typingLabel() {
+    if (this._toolGroup && !this._toolGroup.classList.contains('aiml-tools-done')) {
+      const rows = Object.values(this._toolRows);
+      if (rows.length) {
+        const labels = rows
+          .filter(r => !r.querySelector('.aiml-done'))
+          .map(r => r.querySelector('.aiml-tool-label')?.textContent?.replace(/…$/, ''))
+          .filter(Boolean);
+        if (labels.length) return `${labels[0]}…`;
+      }
+      return this.config.agentMode
+        ? `${this._lastAgent || 'Agent'} is using tools…`
+        : 'Searching your docs…';
+    }
+    if (this.config.agentMode && this._lastAgent) return `${this._lastAgent} is typing…`;
+    return 'AI is typing…';
+  }
+
+  _updateTypingLabel() {
+    if (!this._typingLabelEl) return;
+    const label = this._typingLabel();
+    this._typingLabelEl.textContent = label;
+    if (this._typingEl) this._typingEl.setAttribute('aria-label', label);
   }
 
   appendToken(token) {
@@ -382,21 +420,61 @@ export class WidgetUI {
       msg.className = 'aiml-msg aiml-msg-bot';
       msg.setAttribute('role', 'article');
       msg.setAttribute('aria-label', 'AI Assistant');
-      msg.innerHTML = `<div class="aiml-msg-bubble"></div>`;
+      msg.innerHTML = `<div class="aiml-msg-bubble"><span class="aiml-stream-content" aria-hidden="true"></span><span class="aiml-caret" aria-hidden="true"></span></div>`;
       messages.appendChild(msg);
       this._streamingEl = msg.querySelector('.aiml-msg-bubble');
       this._currentBotMsg = msg;
+      this._caretEl = msg.querySelector('.aiml-caret');
     }
 
-    if (this._streamingEl) {
-      this._streamingEl.innerHTML = renderMarkdown(stripCitations(this._streamBuffer));
-      this._scrollToBottom();
+    // Render on natural breakpoints or debounce rapid tokens — never re-render Markdown on every token,
+    // which is O(n²) on the growing buffer and janky on long answers.
+    if (this._shouldRenderNow(token)) {
+      this._flushStreamRender();
+    } else {
+      this._scheduleStreamRender();
     }
+  }
+
+  // True when the just-appended token ends a Markdown block, sentence, or line so the UI feels responsive.
+  _shouldRenderNow(token) {
+    const tail = this._streamBuffer.slice(-30);
+    return /\n/.test(token)
+      || /[.!?](\s+|$)/.test(tail)
+      || /```\s*$/.test(tail)
+      || /\]\s*\([^)]*\)\s*$/.test(tail)
+      || /^[-*]\s+/.test(token);
+  }
+
+  _scheduleStreamRender() {
+    if (this._renderTimer) return;
+    this._renderTimer = setTimeout(() => {
+      this._renderTimer = null;
+      this._flushStreamRender();
+    }, 80);
+  }
+
+  _flushStreamRender() {
+    if (this._renderTimer) {
+      clearTimeout(this._renderTimer);
+      this._renderTimer = null;
+    }
+    if (!this._streamingEl) return;
+    const content = this._streamingEl.querySelector('.aiml-stream-content');
+    if (!content) return;
+    content.innerHTML = renderMarkdown(stripCitations(this._streamBuffer));
+    // Keep caret as the last child of the bubble so it is not destroyed/re-created on every update.
+    if (this._caretEl && this._caretEl.parentElement !== this._streamingEl) {
+      this._streamingEl.appendChild(this._caretEl);
+    }
+    this._scrollToBottom();
   }
 
   finishBotMessage(citations) {
     this._streaming = false;
     const hadBubble = !!this._streamingEl; // false when the turn produced no tokens (e.g. error path)
+
+    if (this._renderTimer) { clearTimeout(this._renderTimer); this._renderTimer = null; }
 
     if (this._typingEl) { this._typingEl.remove(); this._typingEl = null; }
 
@@ -424,7 +502,16 @@ export class WidgetUI {
       this._streamingEl.appendChild(citDiv);
     }
 
+    // Remove the streaming caret so the final message looks complete, and reveal the final content
+    // to assistive technology now that streaming is done.
+    if (this._caretEl) { this._caretEl.remove(); this._caretEl = null; }
+    if (this._currentBotMsg) {
+      const content = this._currentBotMsg.querySelector('.aiml-stream-content');
+      if (content) content.removeAttribute('aria-hidden');
+    }
+
     this._streamingEl = null;
+    this._typingLabelEl = null;
     if (hadBubble && this._currentBotMsg) this._stampTime(this._currentBotMsg, false);
     this._scrollToBottom();
 
@@ -440,12 +527,15 @@ export class WidgetUI {
   // Wipe the thread (overflow-menu "Clear conversation"): drop all messages and any in-flight
   // stream state, then re-show the greeting so the window isn't left blank.
   clearConversation() {
+    if (this._renderTimer) { clearTimeout(this._renderTimer); this._renderTimer = null; }
     const messages = this.shadow.querySelector('.aiml-messages');
     if (messages) messages.innerHTML = '';
     this._streaming = false;
     this._streamingEl = null;
     this._streamBuffer = '';
     this._currentBotMsg = null;
+    this._caretEl = null;
+    this._typingLabelEl = null;
     this._toolGroup = null;
     this._toolRows = {};
     this._confirmCards = {};
@@ -509,6 +599,7 @@ export class WidgetUI {
   // Live MCP tool activity: a running row flips to done; the group collapses to "Used N tools".
   showTool(info) {
     if (!info || !info.id) return;
+    this._updateTypingLabel();
     const messages = this.shadow.querySelector('.aiml-messages');
     if (!this._toolGroup) {
       this._toolGroup = document.createElement('div');

@@ -42,6 +42,29 @@ export class ChatClient {
     this._abortController = new AbortController();
     const { signal } = this._abortController;
 
+    // Hard ceiling on how long we wait for the first byte. A stalled connection otherwise leaves the
+    // visitor staring at a typing indicator forever. 30s is generous for a chat response; the caller
+    // can abort earlier (e.g. on widget close) via this.abort().
+    const timeoutMs = opts.timeoutMs ?? 30000;
+    let timedOut = false;
+    let timeoutId;
+    const clearChatTimeout = () => {
+      if (timeoutId) { clearTimeout(timeoutId); timeoutId = null; }
+    };
+    if (typeof AbortSignal !== 'undefined' && AbortSignal.timeout) {
+      try {
+        const timeoutSignal = AbortSignal.timeout(timeoutMs);
+        timeoutSignal.addEventListener('abort', () => {
+          timedOut = true;
+          if (this._abortController && !this._abortController.signal.aborted) {
+            this._abortController.abort();
+          }
+        });
+      } catch {}
+    } else {
+      timeoutId = setTimeout(() => { timedOut = true; this.abort(); }, timeoutMs);
+    }
+
     const body = JSON.stringify({
       message,
       conversationId,
@@ -66,9 +89,14 @@ export class ChatClient {
         signal,
       });
     } catch (err) {
-      if (err.name === 'AbortError') return;
+      if (err.name === 'AbortError') {
+        if (timedOut) callbacks.onError('network');
+        return;
+      }
       callbacks.onError('network');
       return;
+    } finally {
+      clearChatTimeout();
     }
 
     if (response.status === 401) { callbacks.onError('auth'); return; }
@@ -119,7 +147,16 @@ export class ChatClient {
         }
       }
     } catch (err) {
-      if (err.name !== 'AbortError') callbacks.onError('stream');
+      // AbortError means the caller explicitly cancelled (e.g. user closed the widget); do not
+      // signal completion or a stream error.
+      if (err.name !== 'AbortError') {
+        callbacks.onError('stream');
+      }
+      return;
     }
+
+    // The server closed the connection without sending [DONE] (e.g. Kestrel idle timeout, load
+    // balancer disconnect, unhandled exception). Always release the UI so the visitor is not trapped.
+    callbacks.onDone();
   }
 }

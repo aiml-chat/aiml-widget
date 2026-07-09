@@ -67,12 +67,17 @@ import { WidgetUI } from './ui.js';
     return 'v-' + Math.random().toString(36).slice(2) + Date.now().toString(36);
   }
 
-  // Fetch widget config from API (non-blocking, falls back to defaults)
+  // Fetch widget config from API. Never block mount for more than 1.5s — on a slow/flaky network we
+  // render with data-attribute defaults immediately rather than leaving the page without a launcher.
   async function fetchConfig() {
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 1500);
       const res = await fetch(`${apiUrl}/v1/widgets/${encodeURIComponent(apiKey)}/config`, {
-        headers: { 'X-Api-Key': apiKey }
+        headers: { 'X-Api-Key': apiKey },
+        signal: controller.signal,
       });
+      clearTimeout(timeoutId);
       if (res.ok) return await res.json();
     } catch {}
     return {};
@@ -116,6 +121,12 @@ import { WidgetUI } from './ui.js';
       // allows it; the API gates and falls back to RAG.
       agentMode: attr('mode') === 'agent' || serverConfig.assistantMode === 'agent',
       showAgentName: (attr('show-agent-name') ?? String(serverConfig.showAgentName ?? true)) !== 'false',
+      // Embeddable appearance: minimal header blends into any site; solid header is the old branded look.
+      headerStyle: oneOf(attr('header-style'), ['minimal', 'solid']) || serverConfig.headerStyle || 'minimal',
+      // Speech-tail bubbles read as chat; flat keeps the previous sharp-corner style.
+      bubbleStyle: oneOf(attr('bubble-style'), ['tail', 'flat']) || serverConfig.bubbleStyle || 'tail',
+      // Show/hide the "AI" badge in the header.
+      showAiBadge: (attr('show-ai-badge') ?? String(serverConfig.showAiBadge ?? true)) !== 'false',
     };
 
     // Owner chose to keep the widget off small screens (e.g. it overlaps a mobile nav).
@@ -165,8 +176,6 @@ import { WidgetUI } from './ui.js';
     ui.host.addEventListener('aiml:send', async (e) => {
       const text = e.detail.text;
       ui.hideWelcomeState();
-      session.history.push({ role: 'user', content: text });
-      saveSession(session);
 
       ui.appendUserMessage(text);
       ui.startBotMessage();
@@ -180,12 +189,15 @@ import { WidgetUI } from './ui.js';
         finalized = true;
         ui.finishBotMessage(citations);
         if (fullResponse) {
+          // Only commit the turn to session history once the assistant has responded. On error the
+          // user bubble remains visible but is not replayed on the next turn.
+          session.history.push({ role: 'user', content: text });
           session.history.push({ role: 'assistant', content: fullResponse });
           saveSession(session);
         }
       };
 
-      await client.send(text, session.history.slice(0, -1), session.conversationId, session.visitorId, {
+      await client.send(text, session.history, session.conversationId, session.visitorId, {
         onConversation(id) {
           if (id && session.conversationId !== id) { session.conversationId = id; saveSession(session); }
         },

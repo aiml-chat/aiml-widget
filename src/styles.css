@@ -54,7 +54,7 @@
   width: 380px;
   max-width: calc(100vw - 48px);
   height: 560px;
-  max-height: calc(100vh - 120px);
+  max-height: calc(100dvh - 120px);
   background: var(--aiml-bg);
   border: 1px solid var(--aiml-border);
   border-radius: var(--aiml-radius);
@@ -73,6 +73,30 @@
 }
 .aiml-window.aiml-left { right: auto; left: var(--aiml-offset-x); transform-origin: bottom left; }
 .aiml-trigger.aiml-left { right: auto; left: var(--aiml-offset-x); }
+
+/* Mobile: sheet-style chat window so it doesn't feel like a tiny popup.
+   Use dvh so the window shrinks when the virtual keyboard opens. */
+@media (max-width: 480px) {
+  .aiml-window {
+    width: calc(100vw - 24px);
+    height: calc(100dvh - 100px);
+    max-height: calc(100dvh - 100px);
+    bottom: calc(var(--aiml-offset-y) + 64px);
+    right: 12px;
+    left: 12px;
+    border-radius: calc(var(--aiml-radius) + 4px);
+  }
+  .aiml-window.aiml-left { right: 12px; left: 12px; }
+  .aiml-window.aiml-maximized {
+    width: calc(100vw - 24px);
+    height: calc(100dvh - 100px);
+    bottom: calc(var(--aiml-offset-y) + 64px);
+  }
+  .aiml-trigger {
+    width: 48px;
+    height: 48px;
+  }
+}
 
 /* Launcher size presets + custom icon */
 .aiml-trigger.aiml-sz-sm { width: 44px; height: 44px; }
@@ -113,71 +137,83 @@
 /* The teaser crowds small screens — launcher alone is enough there. */
 @media (max-width: 640px) { .aiml-launcher-label { display: none; } }
 
-/* Header */
+/* Header — minimal default blends into any site; solid variant keeps the branded look. */
 .aiml-header {
-  padding: 14px 16px;
-  background: var(--aiml-primary);
-  color: #fff;
+  padding: 13px 16px;
+  background: var(--aiml-bg);
+  color: var(--aiml-text);
+  border-bottom: 1px solid var(--aiml-border);
   display: flex;
   align-items: center;
   gap: 10px;
   flex-shrink: 0;
+  position: relative;
 }
 .aiml-avatar {
   width: 32px; height: 32px;
   border-radius: 50%;
-  background: rgba(255,255,255,0.25);
+  background: var(--aiml-surface);
+  border: 1px solid var(--aiml-border);
   display: flex; align-items: center; justify-content: center;
   font-size: 16px;
   flex-shrink: 0;
 }
 .aiml-header-info { flex: 1; min-width: 0; }
 .aiml-header-title { font-weight: 600; font-size: 14px; }
-.aiml-header-subtitle { font-size: 11px; opacity: 0.85; }
+.aiml-header-subtitle { font-size: 11px; color: var(--aiml-text-muted); }
 .aiml-label {
   font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.05em;
-  background: rgba(255,255,255,0.2);
+  background: var(--aiml-surface);
+  color: var(--aiml-text-muted);
+  border: 1px solid var(--aiml-border);
   border-radius: 4px;
   padding: 2px 6px;
   text-transform: uppercase;
   flex-shrink: 0;
 }
-.aiml-close-btn {
-  background: none; border: none; color: rgba(255,255,255,0.8);
+.aiml-close-btn, .aiml-hbtn {
+  background: none; border: none; color: var(--aiml-text-muted);
   cursor: pointer; padding: 4px; border-radius: 6px;
   display: flex; align-items: center; justify-content: center;
   transition: background 0.15s, color 0.15s;
   flex-shrink: 0;
 }
-.aiml-close-btn:hover { background: rgba(255,255,255,0.15); color: #fff; }
-.aiml-close-btn:focus-visible { outline: 2px solid rgba(255,255,255,0.6); }
+.aiml-close-btn:hover, .aiml-hbtn:hover { background: rgba(0,0,0,0.06); color: var(--aiml-text); }
+.aiml-close-btn:focus-visible, .aiml-hbtn:focus-visible { outline: 2px solid var(--aiml-primary); outline-offset: 1px; }
 
-/* Header chrome (agent mode + maximize) — mirrors the design's WidgetWindow header */
-.aiml-header { position: relative; }
-.aiml-hbtn {
-  background: none; border: none; color: rgba(255,255,255,0.8);
-  cursor: pointer; padding: 4px; border-radius: 6px;
-  display: flex; align-items: center; justify-content: center;
-  transition: background 0.15s, color 0.15s;
-  flex-shrink: 0;
+/* Solid header variant (legacy branded look). */
+.aiml-header-solid .aiml-header {
+  background: var(--aiml-primary);
+  color: #fff;
+  border-bottom-color: transparent;
 }
-.aiml-hbtn:hover { background: rgba(255,255,255,0.15); color: #fff; }
-.aiml-hbtn:focus-visible { outline: 2px solid rgba(255,255,255,0.6); }
+.aiml-header-solid .aiml-avatar { background: rgba(255,255,255,0.25); border-color: transparent; }
+.aiml-header-solid .aiml-header-subtitle { color: rgba(255,255,255,0.85); }
+.aiml-header-solid .aiml-label { background: rgba(255,255,255,0.2); color: #fff; border-color: transparent; }
+.aiml-header-solid .aiml-close-btn,
+.aiml-header-solid .aiml-hbtn { color: rgba(255,255,255,0.85); }
+.aiml-header-solid .aiml-close-btn:hover,
+.aiml-header-solid .aiml-hbtn:hover { background: rgba(255,255,255,0.15); color: #fff; }
+.aiml-header-solid .aiml-close-btn:focus-visible,
+.aiml-header-solid .aiml-hbtn:focus-visible { outline-color: rgba(255,255,255,0.6); }
+
+/* Header chrome (agent mode + maximize) */
 .aiml-header-dot-wrap { position: relative; width: 12px; height: 12px; flex-shrink: 0; display: inline-flex; }
-/* The header is tinted with --aiml-primary, so the agent accent needs a white ring to read. */
-.aiml-header-dot { position: absolute; inset: 1px; border-radius: 50%; transition: background 0.3s; box-shadow: 0 0 0 2px rgba(255,255,255,0.85); }
-.aiml-header-ping { box-shadow: none; }
-.aiml-header-ping { animation: aiml-ping 1.6s cubic-bezier(0,0,0.2,1) infinite; opacity: 0.45; }
+/* Minimal header: agent accent dot needs a subtle ring to read on white/cream. */
+.aiml-header-dot { position: absolute; inset: 1px; border-radius: 50%; transition: background 0.3s; box-shadow: 0 0 0 2px rgba(0,0,0,0.08); }
+.aiml-header-solid .aiml-header-dot { box-shadow: 0 0 0 2px rgba(255,255,255,0.85); }
+.aiml-header-ping { box-shadow: none; animation: aiml-ping 1.6s cubic-bezier(0,0,0.2,1) infinite; opacity: 0.45; }
 @keyframes aiml-ping { 0% { transform: scale(1); opacity: 0.45; } 75%, 100% { transform: scale(2.4); opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .aiml-header-ping { animation: none; opacity: 0; } }
-.aiml-header-now { font-weight: 600; }
+.aiml-header-now { font-weight: 600; color: var(--aiml-text); }
+.aiml-header-solid .aiml-header-now { color: #fff; }
 .aiml-menu {
   position: absolute; top: 100%; right: 12px; margin-top: 4px; z-index: 30;
   min-width: 190px; padding: 4px;
-  background: var(--aiml-bg, #fff); color: var(--aiml-text, #1C1917);
-  border: 1px solid rgba(0,0,0,0.1); border-radius: 10px;
+  background: var(--aiml-bg); color: var(--aiml-text);
+  border: 1px solid var(--aiml-border); border-radius: 10px;
   box-shadow: 0 8px 24px rgba(28,25,23,0.18);
 }
 .aiml-menu-item {
@@ -189,7 +225,7 @@
 .aiml-menu-item:hover { background: rgba(0,0,0,0.06); }
 .aiml-window.aiml-maximized {
   width: min(560px, calc(100vw - 32px));
-  height: min(760px, calc(100vh - 32px));
+  height: min(760px, calc(100dvh - 32px));
 }
 
 /* Messages */
@@ -216,22 +252,41 @@
   max-width: 88%;
   min-width: 0;
   animation: aiml-fade-in 0.2s ease;
+  position: relative;
 }
 @keyframes aiml-fade-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
 .aiml-msg-user { align-self: flex-end; align-items: flex-end; }
 .aiml-msg-bubble {
   padding: 10px 14px;
-  border-radius: 16px;
+  border-radius: 18px;
   font-size: 14px;
   line-height: 1.5;
   word-break: break-word;
   max-width: 100%;
   min-width: 0;
+  position: relative;
+}
+/* Speech tails — default chat-like style. A small pseudo-element sits at the bubble's bottom corner
+   and curves back INTO the bubble, so it reads as a tapered tail flick rather than a protruding
+   half-circle. Kept additive (bubble-coloured) so it works on any host-page background. */
+.aiml-msg-bubble::before {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  width: 10px;
+  height: 12px;
+  pointer-events: none;
 }
 .aiml-msg-user .aiml-msg-bubble {
   background: var(--aiml-primary);
   color: #fff;
   border-bottom-right-radius: 4px;
+}
+.aiml-msg-user .aiml-msg-bubble::before {
+  right: -5px;
+  background: var(--aiml-primary);
+  /* Curve toward the bubble (bottom-left), leaving a soft tip on the outer side. */
+  border-bottom-left-radius: 12px;
 }
 .aiml-msg-bot .aiml-msg-bubble {
   background: var(--aiml-surface);
@@ -239,6 +294,20 @@
   border: 1px solid var(--aiml-border);
   border-bottom-left-radius: 4px;
 }
+.aiml-msg-bot .aiml-msg-bubble::before {
+  left: -5px;
+  background: var(--aiml-surface);
+  /* Curve toward the bubble (bottom-right), leaving a soft tip on the outer side. */
+  border-bottom-right-radius: 12px;
+  border-bottom: 1px solid var(--aiml-border);
+  border-left: 1px solid var(--aiml-border);
+}
+
+/* Flat bubble variant (legacy sharp-corner style). */
+.aiml-bubbles-flat .aiml-msg-bubble { border-radius: 16px; }
+.aiml-bubbles-flat .aiml-msg-bubble::before { display: none; }
+.aiml-bubbles-flat .aiml-msg-user .aiml-msg-bubble { border-bottom-right-radius: 4px; }
+.aiml-bubbles-flat .aiml-msg-bot .aiml-msg-bubble { border-bottom-left-radius: 4px; }
 
 /* Markdown in bot bubbles */
 .aiml-msg-bubble code {
@@ -289,17 +358,40 @@
 .aiml-citation-static { color: var(--aiml-text); opacity: 0.75; cursor: default; }
 .aiml-citation-static:hover { text-decoration: none; }
 
-/* Typing indicator */
-.aiml-typing { display: flex; gap: 4px; padding: 10px 14px; align-items: center; }
-.aiml-typing span {
-  width: 7px; height: 7px;
+/* Typing indicator — contextual label + single pulsing orb. */
+.aiml-typing { display: flex; gap: 8px; padding: 8px 14px; align-items: center; }
+.aiml-typing-orb {
+  width: 8px; height: 8px;
   border-radius: 50%;
-  background: var(--aiml-text-muted);
-  animation: aiml-bounce 1.2s ease infinite;
+  background: var(--aiml-primary);
+  animation: aiml-pulse-orb 1.4s ease-in-out infinite;
+  flex-shrink: 0;
 }
-.aiml-typing span:nth-child(2) { animation-delay: 0.2s; }
-.aiml-typing span:nth-child(3) { animation-delay: 0.4s; }
-@keyframes aiml-bounce { 0%,60%,100% { transform: translateY(0); } 30% { transform: translateY(-6px); } }
+.aiml-typing-label {
+  font-size: 13px;
+  color: var(--aiml-text-muted);
+  line-height: 1.4;
+}
+@keyframes aiml-pulse-orb {
+  0%, 100% { transform: scale(0.85); opacity: 0.55; }
+  50% { transform: scale(1.1); opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .aiml-typing-orb { animation: none; opacity: 0.7; }
+}
+
+/* Streaming caret cursor — blinks at the end of the in-flight answer. */
+.aiml-caret {
+  display: inline-block;
+  width: 2px;
+  height: 1.1em;
+  background: var(--aiml-primary);
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  animation: aiml-caret-blink 1s step-end infinite;
+}
+@keyframes aiml-caret-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .aiml-caret { animation: none; opacity: 0.6; } }
 
 /* Input area */
 .aiml-input-area {
